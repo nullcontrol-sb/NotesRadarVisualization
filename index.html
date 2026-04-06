@@ -494,69 +494,68 @@
       resultsByType  = {};
       unplayedByType = {};
 
-      // スコアCSVから プレイ済みセット と レベルマップ を構築
-      const playedSet = new Set();
-      const levelMap  = new Map(); // titleKey::diffAbbr → level
+      // レベルマップをスコアCSVから構築 (titleKey::diffAbbr → level)
+      const levelMap = new Map();
       for (const row of scoreRows) {
         const rawTitle = (row['タイトル'] || '').trim();
         if (!rawTitle) continue;
         const tk = titleKey(rawTitle);
         for (const diff of DIFF_MAP) {
-          const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
-          const level     = row[`${diff.full} 難易度`] || '';
-          const key       = `${tk}::${diff.abbr}`;
-          if (level) levelMap.set(key, level);
-          const score = parseInt(row[`${diff.full} スコア`]);
-          if (clearType !== 'NO PLAY' && clearType !== '' && !isNaN(score) && score > 0) {
-            playedSet.add(key);
-          }
+          const level = row[`${diff.full} 難易度`] || '';
+          if (level) levelMap.set(`${tk}::${diff.abbr}`, level);
         }
       }
 
+      // 第1パス: resultsByType を構築
       for (const type of RADAR_TYPES) {
         const radarMap = radarMapByType[type];
         if (!radarMap || radarMap.size === 0) continue;
-
-        const results   = [];
-        const unplayed  = [];
-
+        const results = [];
         for (const row of scoreRows) {
           const rawTitle = (row['タイトル'] || '').trim();
           if (!rawTitle) continue;
           const title = titleKey(rawTitle);
-
           for (const diff of DIFF_MAP) {
             const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
             if (clearType === 'NO PLAY' || clearType === '') continue;
-
             const score = parseInt(row[`${diff.full} スコア`]);
             if (isNaN(score) || score <= 0) continue;
-
             const level = row[`${diff.full} 難易度`] || '';
             const radar = radarMap.get(`${title}::${diff.abbr}`);
             if (!radar || radar.notes <= 0) continue;
-
             const maxEx      = radar.notes * 2;
             const rate       = score / maxEx;
             const radarValue = rate * radar.max;
             results.push({ title: rawTitle, diffFull: diff.full, diffAbbr: diff.abbr, level, score, rate, radarValue, maxEx, radarMax: radar.max });
           }
         }
+        results.sort((a, b) => b.radarValue - a.radarValue);
+        resultsByType[type] = results;
+      }
 
-        // 未プレイ: レーダーマップにあってplayedSetにない組み合わせ
+      // 第2パス: unplayedByType を構築
+      // playedSet はマッチング済み results から生成し、タイトル照合ズレを回避する
+      for (const type of RADAR_TYPES) {
+        const radarMap = radarMapByType[type];
+        if (!radarMap || radarMap.size === 0) continue;
+
+        const playedSet = new Set(
+          (resultsByType[type] || []).map(r => `${titleKey(r.title)}::${r.diffAbbr}`)
+        );
+
+        const unplayed = [];
         for (const [key, radar] of radarMap) {
           if (playedSet.has(key)) continue;
-          const [tk, diffAbbr] = key.split('::');
+          const sepIdx    = key.lastIndexOf('::');
+          const diffAbbr  = key.slice(sepIdx + 2);
           const diffEntry = DIFF_MAP.find(d => d.abbr === diffAbbr);
           if (!diffEntry) continue;
           const level = levelMap.get(key) || '';
           const maxEx = radar.notes * 2;
-          unplayed.push({ title: radar.rawTitle || tk, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
+          unplayed.push({ title: radar.rawTitle || key.slice(0, sepIdx), diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
         }
 
-        results.sort((a, b) => b.radarValue - a.radarValue);
         unplayed.sort((a, b) => b.radarMax - a.radarMax);
-        resultsByType[type]  = results;
         unplayedByType[type] = unplayed;
       }
 
