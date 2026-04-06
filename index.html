@@ -447,11 +447,15 @@
         .normalize('NFC');
     }
 
-    // マップキー用：NFKC正規化＋記号・区切り文字を除去して照合の揺れを吸収
-    // †♥～！？等のCSV間エンコーディング差異を吸収するため文字・数字以外を全除去
+    // マップキー用：NFKD正規化＋ダイアクリティカル除去＋記号除去で照合揺れを吸収
+    // Ü→U、†♥～！？等のCSV間差異を吸収する
     function titleKey(title) {
-      return normalizeTitle(title)
-        .normalize('NFKC')               // 全角→半角など互換正規化
+      return title
+        .trim()
+        .replace(/\u3000/g, ' ')
+        .normalize('NFKD')               // 互換分解 (Ü→U+combining, 全角→半角等)
+        .replace(/\p{M}/gu, '')          // combining mark (ダイアクリティカル) を除去
+        .toLowerCase()
         .replace(/[^\p{L}\p{N}]/gu, ''); // 文字・数字以外を除去
     }
 
@@ -678,7 +682,7 @@
           <td class="rank center">${medal}</td>
           <td class="title" title="${escHtml(r.title)}">${escHtml(r.title)}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
-          <td class="center">${r.level ? '☆' + r.level : '—'}</td>
+          <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
           <td class="right">${(() => {
             const { level, nearestName, diff } = getDJLevelInfo(r.score, r.maxEx);
             const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
@@ -736,7 +740,7 @@
           <td class="rank center">${medal}</td>
           <td class="title" title="${escHtml(r.title)}">${escHtml(r.title)}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
-          <td class="center">${r.level ? '☆' + r.level : '—'}</td>
+          <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
           <td class="radar">${(Math.floor(r.radarMax * 100) / 100).toFixed(2)}${guidanceHtml}</td>
         </tr>`;
       }).join('');
