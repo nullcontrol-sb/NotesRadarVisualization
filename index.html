@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NotesRadarVisualization</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 0 0 48px;
+    }
+
+    .header {
+      background: #0f3460;
+      padding: 18px 24px 14px;
+      text-align: center;
+    }
+    .header h1 {
+      color: #a0d8ef;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .header p {
+      color: #a0aec0;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .upload-section {
+      max-width: 860px;
+      margin: 32px auto 0;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .upload-card {
+      background: #16213e;
+      border: 2px dashed #0f3460;
+      border-radius: 14px;
+      padding: 28px 20px;
+      text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-card.drag-over {
+      border-color: #e94560;
+      background: #1e2a4a;
+    }
+    .upload-card.loaded {
+      border-color: #38a169;
+      border-style: solid;
+    }
+
+    .upload-icon { font-size: 36px; margin-bottom: 8px; }
+    .upload-card h3 { font-size: 13px; color: #a0d8ef; margin-bottom: 6px; }
+    .upload-card p { font-size: 12px; color: #a0aec0; margin-bottom: 14px; }
+
+    .upload-card label {
+      display: inline-block;
+      padding: 8px 20px;
+      background: #e94560;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.2s;
+    }
+    .upload-card label:hover { background: #ff6b81; }
+    .upload-card input[type="file"] { display: none; }
+
+    .file-name {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #68d391;
+      min-height: 18px;
+    }
+
+    .result-section {
+      max-width: 960px;
+      margin: 32px auto 0;
+      padding: 0 20px;
+    }
+
+    .info-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #a0aec0;
+    }
+    .info-bar .formula {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: #a0d8ef;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #16213e;
+      font-size: 14px;
+    }
+
+    thead tr { background: #0f3460; }
+    thead th {
+      padding: 12px 14px;
+      text-align: center;
+      color: #a0d8ef;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    thead th.left { text-align: left; }
+
+    tbody tr {
+      border-bottom: 1px solid #0f3460;
+      transition: background 0.15s;
+    }
+    tbody tr:hover { background: #1e2a4a; }
+    tbody tr:nth-child(odd) { background: #16213e; }
+    tbody tr:nth-child(even) { background: #1a2444; }
+    tbody tr:hover { background: #1e2a4a !important; }
+
+    tbody td {
+      padding: 10px 14px;
+      color: #e2e8f0;
+      white-space: nowrap;
+    }
+    tbody td.title {
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    tbody td.center { text-align: center; }
+    tbody td.right { text-align: right; }
+    tbody td.radar { text-align: right; font-weight: 700; color: #a0d8ef; }
+
+    .rank-1 td.rank { color: #ffd700; font-weight: 700; }
+    .rank-2 td.rank { color: #c0c0c0; font-weight: 700; }
+    .rank-3 td.rank { color: #cd7f32; font-weight: 700; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-B { background: #2d5a27; color: #68d391; }
+    .badge-N { background: #1e3a6e; color: #63b3ed; }
+    .badge-H { background: #5a2d2d; color: #fc8181; }
+    .badge-A { background: #5a4a1e; color: #f6ad55; }
+    .badge-L { background: #3d2d5a; color: #b794f4; }
+
+    .hidden { display: none; }
+
+    .error-msg {
+      color: #fc8181;
+      background: #2d1515;
+      border: 1px solid #e94560;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>NotesRadarVisualization</h1>
+    <p>beatmania IIDX SP ノーツレーダー × スコアデータ 上位20件</p>
+  </div>
+
+  <div class="upload-section">
+    <div class="upload-card" id="card-radar">
+      <div class="upload-icon">📊</div>
+      <h3>notes_radar.csv</h3>
+      <p>app.py で出力したCSV</p>
+      <label for="input-radar">ファイルを選択</label>
+      <input type="file" id="input-radar" accept=".csv">
+      <div class="file-name" id="name-radar"></div>
+    </div>
+
+    <div class="upload-card" id="card-score">
+      <div class="upload-icon">🎮</div>
+      <h3>スコアCSV</h3>
+      <p>e-amusement から出力したSPスコアデータ</p>
+      <label for="input-score">ファイルを選択</label>
+      <input type="file" id="input-score" accept=".csv">
+      <div class="file-name" id="name-score"></div>
+    </div>
+  </div>
+
+  <div id="error-area" class="result-section hidden">
+    <div class="error-msg" id="error-msg"></div>
+  </div>
+
+  <div class="result-section hidden" id="result-section">
+    <div class="info-bar">
+      <span id="info-text"></span>
+      <span class="formula">算出値 ＝ EXスコア ÷ (ノーツ数×2) × レーダーMAX値</span>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th class="left">タイトル</th>
+            <th>難易度</th>
+            <th>☆</th>
+            <th>EXスコア</th>
+            <th>スコアレート</th>
+            <th>レーダー値</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const DIFF_MAP = [
+      { full: 'BEGINNER',   abbr: 'B' },
+      { full: 'NORMAL',     abbr: 'N' },
+      { full: 'HYPER',      abbr: 'H' },
+      { full: 'ANOTHER',    abbr: 'A' },
+      { full: 'LEGGENDARIA',abbr: 'L' },
+    ];
+
+    let radarRows = null;
+    let scoreRows = null;
+    let radarHeaders = null;
+    let scoreHeaders = null;
+
+    // ── ファイル読み込み ─────────────────────
+    function setupUpload(inputId, cardId, nameId, onLoad) {
+      const input = document.getElementById(inputId);
+      const card  = document.getElementById(cardId);
+      const nameEl = document.getElementById(nameId);
+
+      input.addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (file) readFile(file, nameEl, card, onLoad);
+      });
+      card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+      card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+      card.addEventListener('drop', e => {
+        e.preventDefault();
+        card.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) readFile(file, nameEl, card, onLoad);
+      });
+    }
+
+    function readFile(file, nameEl, card, onLoad) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        nameEl.textContent = '✔ ' + file.name;
+        card.classList.add('loaded');
+        onLoad(e.target.result);
+        tryCalculate();
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+
+    setupUpload('input-radar', 'card-radar', 'name-radar', text => {
+      const { headers, rows } = parseCSV(text);
+      radarHeaders = headers;
+      radarRows = rows;
+    });
+
+    setupUpload('input-score', 'card-score', 'name-score', text => {
+      const { headers, rows } = parseCSV(text);
+      scoreHeaders = headers;
+      scoreRows = rows;
+    });
+
+    // ── CSV パース ───────────────────────────
+    function parseCSV(text) {
+      // BOM除去
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const lines = text.trim().split(/\r?\n/);
+      const headers = splitLine(lines[0]);
+      const rows = lines.slice(1).map(l => {
+        const cells = splitLine(l);
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = (cells[i] || '').trim());
+        return obj;
+      });
+      return { headers, rows };
+    }
+
+    function splitLine(line) {
+      const result = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (c === ',' && !inQ) {
+          result.push(cur); cur = '';
+        } else {
+          cur += c;
+        }
+      }
+      result.push(cur);
+      return result;
+    }
+
+    // ── 計算 ─────────────────────────────────
+    function tryCalculate() {
+      if (!radarRows || !scoreRows) return;
+      hideError();
+
+      // notes_radar ルックアップ: "タイトル::abbr" -> {notes, max}
+      const radarMap = new Map();
+      for (const row of radarRows) {
+        if ((row['SP/DP'] || '').trim() !== 'SP') continue;
+        const title = (row['タイトル'] || '').trim();
+        const diff  = (row['難易度']  || '').trim();
+        const notes = parseInt(row['ノーツ数']);
+        const max   = parseFloat(row['MAX']);
+        if (!title || !diff || isNaN(notes) || isNaN(max)) continue;
+        radarMap.set(`${title}::${diff}`, { notes, max });
+      }
+
+      if (radarMap.size === 0) {
+        showError('notes_radar.csv を正しく読み込めませんでした。列名を確認してください。');
+        return;
+      }
+
+      const results = [];
+
+      for (const row of scoreRows) {
+        const title = (row['タイトル'] || '').trim();
+        if (!title) continue;
+
+        for (const diff of DIFF_MAP) {
+          const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
+          if (clearType === 'NO PLAY' || clearType === '') continue;
+
+          const score = parseInt(row[`${diff.full} スコア`]);
+          if (isNaN(score) || score <= 0) continue;
+
+          const level = row[`${diff.full} 難易度`] || '';
+
+          const key = `${title}::${diff.abbr}`;
+          const radar = radarMap.get(key);
+          if (!radar || radar.notes <= 0) continue;
+
+          const maxScore   = radar.notes * 2;
+          const rate       = score / maxScore;
+          const radarValue = rate * radar.max;
+
+          results.push({ title, diffFull: diff.full, diffAbbr: diff.abbr, level, score, rate, radarValue });
+        }
+      }
+
+      if (results.length === 0) {
+        showError('データを算出できませんでした。タイトルが一致しているか確認してください。');
+        return;
+      }
+
+      results.sort((a, b) => b.radarValue - a.radarValue);
+      renderTable(results.slice(0, 20), results.length);
+    }
+
+    // ── 描画 ─────────────────────────────────
+    function renderTable(top20, totalCount) {
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = top20.map((r, i) => {
+        const rank = i + 1;
+        const rankClass = rank <= 3 ? `rank-${rank}` : '';
+        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+        return `<tr class="${rankClass}">
+          <td class="rank center">${medal}</td>
+          <td class="title" title="${escHtml(r.title)}">${escHtml(r.title)}</td>
+          <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
+          <td class="center">${r.level ? '☆' + r.level : '—'}</td>
+          <td class="right">${r.score.toLocaleString()}</td>
+          <td class="right">${(r.rate * 100).toFixed(2)}%</td>
+          <td class="radar">${r.radarValue.toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('info-text').textContent =
+        `算出対象: ${totalCount.toLocaleString()} 件 → 上位 20 件表示`;
+      document.getElementById('result-section').classList.remove('hidden');
+    }
+
+    function showError(msg) {
+      document.getElementById('error-msg').textContent = msg;
+      document.getElementById('error-area').classList.remove('hidden');
+      document.getElementById('result-section').classList.add('hidden');
+    }
+    function hideError() {
+      document.getElementById('error-area').classList.add('hidden');
+    }
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+</body>
+</html>
