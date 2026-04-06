@@ -188,6 +188,10 @@
     tbody tr:nth-child(odd)  { background: #16213e; }
     tbody tr:nth-child(even) { background: #1a2444; }
     tbody tr:hover { background: #1e2a4a !important; }
+    tbody tr.out-of-top10:nth-child(odd)  { background: #111827; }
+    tbody tr.out-of-top10:nth-child(even) { background: #131b2e; }
+    tbody tr.out-of-top10 td { color: #6b7280; }
+    tbody tr.out-of-top10:hover { background: #1a2233 !important; }
 
     tbody td {
       padding: 10px 14px;
@@ -510,7 +514,8 @@
         const rank = i + 1;
         const rankClass = rank <= 3 ? `rank-${rank}` : '';
         const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-        return `<tr class="${rankClass}">
+        const dimClass = rank > 10 ? ' out-of-top10' : '';
+        return `<tr class="${rankClass}${dimClass}">
           <td class="rank center">${medal}</td>
           <td class="title" title="${escHtml(r.title)}">${escHtml(r.title)}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
