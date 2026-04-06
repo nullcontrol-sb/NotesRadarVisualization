@@ -263,7 +263,7 @@
 
   <script>
     const SHEETS_CSV_URL =
-      'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpuTUK1Zq7ilYjghv_3KF01bJ60qXlZPSn6U7N-Xp1iJxNWIcLDeSHL2GmaRJ9rd9BHvuwSFPD6CVk/pub?output=csv';
+      'https://docs.google.com/spreadsheets/d/1If1uzZZY5zL0ZFXC394JsnggNX0fvkBmiGNpBSZvGOM/gviz/tq?tqx=out:csv&gid=711426838';
 
     const DIFF_MAP = [
       { full: 'BEGINNER',    abbr: 'B' },
@@ -297,7 +297,7 @@
         setRadarStatus('ok', `✔ ノーツレーダーデータ読み込み完了 (${rows.length} 件)`);
         tryCalculate();
       } catch (e) {
-        setRadarStatus('error', '✖ ノーツレーダーデータの取得に失敗しました。スプレッドシートの共有設定を確認してください。');
+        setRadarStatus('error', '✖ 取得失敗: ' + e.message);
       }
     }
 
