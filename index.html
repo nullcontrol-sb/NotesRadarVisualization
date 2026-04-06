@@ -56,7 +56,7 @@
 
     .upload-icon { font-size: 36px; margin-bottom: 8px; }
     .upload-card h3 { font-size: 13px; color: #a0d8ef; margin-bottom: 6px; }
-    .upload-card p { font-size: 12px; color: #a0aec0; margin-bottom: 14px; }
+    .upload-card p  { font-size: 12px; color: #a0aec0; margin-bottom: 14px; }
 
     .upload-card label {
       display: inline-block;
@@ -116,26 +116,51 @@
       padding: 0 20px;
     }
 
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 0;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: 8px 20px;
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      color: #a0aec0;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      letter-spacing: 0.03em;
+    }
+    .tab-btn:hover { background: #1e2a4a; color: #e2e8f0; }
+    .tab-btn.active {
+      background: #0f3460;
+      color: #a0d8ef;
+      border-color: #0f3460;
+    }
+
     .info-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 12px;
+      padding: 8px 14px;
+      background: #0f3460;
       font-size: 13px;
       color: #a0aec0;
     }
     .info-bar .formula {
-      background: #16213e;
-      border: 1px solid #0f3460;
-      border-radius: 8px;
-      padding: 6px 14px;
       font-size: 12px;
       color: #a0d8ef;
     }
 
     .table-wrapper {
       overflow-x: auto;
-      border-radius: 12px;
+      border-radius: 0 0 12px 12px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.4);
     }
 
@@ -160,8 +185,7 @@
       border-bottom: 1px solid #0f3460;
       transition: background 0.15s;
     }
-    tbody tr:hover { background: #1e2a4a; }
-    tbody tr:nth-child(odd) { background: #16213e; }
+    tbody tr:nth-child(odd)  { background: #16213e; }
     tbody tr:nth-child(even) { background: #1a2444; }
     tbody tr:hover { background: #1e2a4a !important; }
 
@@ -176,8 +200,8 @@
       text-overflow: ellipsis;
     }
     tbody td.center { text-align: center; }
-    tbody td.right { text-align: right; }
-    tbody td.radar { text-align: right; font-weight: 700; color: #a0d8ef; }
+    tbody td.right  { text-align: right; }
+    tbody td.radar  { text-align: right; font-weight: 700; color: #a0d8ef; }
 
     .rank-1 td.rank { color: #ffd700; font-weight: 700; }
     .rank-2 td.rank { color: #c0c0c0; font-weight: 700; }
@@ -239,6 +263,7 @@
   </div>
 
   <div class="result-section hidden" id="result-section">
+    <div class="tab-bar" id="tab-bar"></div>
     <div class="info-bar">
       <span id="info-text"></span>
       <span class="formula">算出値 ＝ EXスコア ÷ (ノーツ数×2) × レーダーMAX値</span>
@@ -262,8 +287,9 @@
   </div>
 
   <script>
-    const SHEETS_CSV_URL =
-      'https://docs.google.com/spreadsheets/d/1If1uzZZY5zL0ZFXC394JsnggNX0fvkBmiGNpBSZvGOM/gviz/tq?tqx=out:csv&gid=711426838';
+    const SHEET_ID   = '1If1uzZZY5zL0ZFXC394JsnggNX0fvkBmiGNpBSZvGOM';
+    const BASE_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+    const RADAR_TYPES = ['NOTES', 'CHORD', 'PEAK', 'CHARGE', 'SCRATCH', 'SOF-LAN'];
 
     const DIFF_MAP = [
       { full: 'BEGINNER',    abbr: 'B' },
@@ -273,8 +299,29 @@
       { full: 'LEGGENDARIA', abbr: 'L' },
     ];
 
-    let radarRows = null;
-    let scoreRows = null;
+    // radarMapByType: { NOTES: Map, CHORD: Map, ... }
+    let radarMapByType = {};
+    let resultsByType  = {};
+    let scoreRows      = null;
+    let activeTab      = 'NOTES';
+
+    // ── タブ生成 ─────────────────────────────
+    const tabBar = document.getElementById('tab-bar');
+    RADAR_TYPES.forEach(type => {
+      const btn = document.createElement('button');
+      btn.className = 'tab-btn' + (type === 'NOTES' ? ' active' : '');
+      btn.textContent = type;
+      btn.addEventListener('click', () => switchTab(type));
+      btn.id = `tab-${type}`;
+      tabBar.appendChild(btn);
+    });
+
+    function switchTab(type) {
+      activeTab = type;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`tab-${type}`).classList.add('active');
+      renderCurrentTab();
+    }
 
     // ── レーダーデータ取得 ────────────────────
     function setRadarStatus(state, text) {
@@ -289,12 +336,31 @@
     async function fetchRadarData() {
       setRadarStatus('loading', 'ノーツレーダーデータを読み込み中…');
       try {
-        const res = await fetch(SHEETS_CSV_URL);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const text = await res.text();
-        const { rows } = parseCSV(text);
-        radarRows = rows;
-        setRadarStatus('ok', `✔ ノーツレーダーデータ読み込み完了 (${rows.length} 件)`);
+        const results = await Promise.all(
+          RADAR_TYPES.map(type =>
+            fetch(BASE_URL + encodeURIComponent(type))
+              .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+              .then(text => ({ type, text }))
+          )
+        );
+
+        for (const { type, text } of results) {
+          const { rows } = parseCSV(text);
+          const map = new Map();
+          for (const row of rows) {
+            if ((row['SP/DP'] || '').trim() !== 'SP') continue;
+            const title = (row['タイトル'] || '').trim();
+            const diff  = (row['難易度']   || '').trim();
+            const notes = parseInt(row['ノーツ数']);
+            const max   = parseFloat(row['MAX']);
+            if (!title || !diff || isNaN(notes) || isNaN(max)) continue;
+            map.set(`${title}::${diff}`, { notes, max });
+          }
+          radarMapByType[type] = map;
+        }
+
+        const total = Object.values(radarMapByType).reduce((s, m) => s + m.size, 0);
+        setRadarStatus('ok', `✔ ノーツレーダーデータ読み込み完了 (全6種 ${total.toLocaleString()} 件)`);
         tryCalculate();
       } catch (e) {
         setRadarStatus('error', '✖ 取得失敗: ' + e.message);
@@ -371,63 +437,56 @@
 
     // ── 計算 ─────────────────────────────────
     function tryCalculate() {
-      if (!radarRows || !scoreRows) return;
+      if (!scoreRows || Object.keys(radarMapByType).length === 0) return;
       hideError();
 
-      const radarMap = new Map();
-      for (const row of radarRows) {
-        if ((row['SP/DP'] || '').trim() !== 'SP') continue;
-        const title = (row['タイトル'] || '').trim();
-        const diff  = (row['難易度']  || '').trim();
-        const notes = parseInt(row['ノーツ数']);
-        const max   = parseFloat(row['MAX']);
-        if (!title || !diff || isNaN(notes) || isNaN(max)) continue;
-        radarMap.set(`${title}::${diff}`, { notes, max });
-      }
+      resultsByType = {};
 
-      if (radarMap.size === 0) {
-        showError('スプレッドシートのデータを正しく読み込めませんでした。列名を確認してください。');
-        return;
-      }
+      for (const type of RADAR_TYPES) {
+        const radarMap = radarMapByType[type];
+        if (!radarMap || radarMap.size === 0) continue;
 
-      const results = [];
+        const results = [];
+        for (const row of scoreRows) {
+          const title = (row['タイトル'] || '').trim();
+          if (!title) continue;
 
-      for (const row of scoreRows) {
-        const title = (row['タイトル'] || '').trim();
-        if (!title) continue;
+          for (const diff of DIFF_MAP) {
+            const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
+            if (clearType === 'NO PLAY' || clearType === '') continue;
 
-        for (const diff of DIFF_MAP) {
-          const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
-          if (clearType === 'NO PLAY' || clearType === '') continue;
+            const score = parseInt(row[`${diff.full} スコア`]);
+            if (isNaN(score) || score <= 0) continue;
 
-          const score = parseInt(row[`${diff.full} スコア`]);
-          if (isNaN(score) || score <= 0) continue;
+            const level = row[`${diff.full} 難易度`] || '';
+            const radar = radarMap.get(`${title}::${diff.abbr}`);
+            if (!radar || radar.notes <= 0) continue;
 
-          const level = row[`${diff.full} 難易度`] || '';
-
-          const key = `${title}::${diff.abbr}`;
-          const radar = radarMap.get(key);
-          if (!radar || radar.notes <= 0) continue;
-
-          const maxScore   = radar.notes * 2;
-          const rate       = score / maxScore;
-          const radarValue = rate * radar.max;
-
-          results.push({ title, diffFull: diff.full, diffAbbr: diff.abbr, level, score, rate, radarValue });
+            const rate       = score / (radar.notes * 2);
+            const radarValue = rate * radar.max;
+            results.push({ title, diffFull: diff.full, diffAbbr: diff.abbr, level, score, rate, radarValue });
+          }
         }
+
+        results.sort((a, b) => b.radarValue - a.radarValue);
+        resultsByType[type] = results;
       }
 
-      if (results.length === 0) {
+      if (Object.keys(resultsByType).length === 0) {
         showError('データを算出できませんでした。タイトルが一致しているか確認してください。');
         return;
       }
 
-      results.sort((a, b) => b.radarValue - a.radarValue);
-      renderTable(results.slice(0, 20), results.length);
+      document.getElementById('result-section').classList.remove('hidden');
+      renderCurrentTab();
     }
 
     // ── 描画 ─────────────────────────────────
-    function renderTable(top20, totalCount) {
+    function renderCurrentTab() {
+      const results = resultsByType[activeTab];
+      if (!results) return;
+
+      const top20 = results.slice(0, 20);
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = top20.map((r, i) => {
         const rank = i + 1;
@@ -445,8 +504,7 @@
       }).join('');
 
       document.getElementById('info-text').textContent =
-        `算出対象: ${totalCount.toLocaleString()} 件 → 上位 20 件表示`;
-      document.getElementById('result-section').classList.remove('hidden');
+        `${activeTab} — 算出対象: ${results.length.toLocaleString()} 件 → 上位 20 件表示`;
     }
 
     function showError(msg) {
@@ -464,7 +522,6 @@
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    // ── 起動時にレーダーデータ取得 ────────────
     fetchRadarData();
   </script>
 </body>
