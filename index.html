@@ -408,6 +408,8 @@
       reader.onload = e => {
         nameEl.textContent = '✔ ' + file.name;
         card.classList.add('loaded');
+        localStorage.setItem('scoreCSV',      e.target.result);
+        localStorage.setItem('scoreCSVName',  file.name);
         onLoad(e.target.result);
         tryCalculate();
       };
@@ -642,6 +644,18 @@
       return String(s)
         .replace(/&/g,'&amp;').replace(/</g,'&lt;')
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // キャッシュからスコアデータを復元
+    const cachedCSV  = localStorage.getItem('scoreCSV');
+    const cachedName = localStorage.getItem('scoreCSVName');
+    if (cachedCSV) {
+      const { rows } = parseCSV(cachedCSV);
+      scoreRows = rows;
+      const nameEl = document.getElementById('name-score');
+      const card   = document.getElementById('card-score');
+      nameEl.textContent = '✔ ' + cachedName + '（キャッシュ）';
+      card.classList.add('loaded');
     }
 
     fetchRadarData();
