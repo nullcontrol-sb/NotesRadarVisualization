@@ -499,7 +499,7 @@
             const maxEx      = radar.notes * 2;
             const rate       = score / maxEx;
             const radarValue = rate * radar.max;
-            results.push({ title: rawTitle, diffFull: diff.full, diffAbbr: diff.abbr, level, score, rate, radarValue, maxEx });
+            results.push({ title: rawTitle, diffFull: diff.full, diffAbbr: diff.abbr, level, score, rate, radarValue, maxEx, radarMax: radar.max });
           }
         }
 
@@ -566,12 +566,25 @@
       if (!results) return;
 
       const top20 = results.slice(0, 20);
+      const top10threshold = results.length >= 10 ? results[9].radarValue : null;
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = top20.map((r, i) => {
         const rank = i + 1;
         const rankClass = rank <= 3 ? `rank-${rank}` : '';
         const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
         const dimClass = rank > 10 ? ' out-of-top10' : '';
+
+        let guidanceHtml = '';
+        if (rank > 10 && top10threshold !== null) {
+          const targetScore = Math.floor(top10threshold * r.maxEx / r.radarMax) + 1;
+          const pointsNeeded = targetScore - r.score;
+          if (pointsNeeded > 0) {
+            const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
+            const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
+            guidanceHtml = `<br><span style="color:#fc8181;font-weight:600;font-size:11px;">あと${pointsNeeded.toLocaleString()}点(${nearestName}${sign}${diff})以上でTOP10入り</span>`;
+          }
+        }
+
         return `<tr class="${rankClass}${dimClass}">
           <td class="rank center">${medal}</td>
           <td class="title" title="${escHtml(r.title)}">${escHtml(r.title)}</td>
@@ -583,7 +596,7 @@
             return `${r.score.toLocaleString()}<br><span class="dj-info dj-${nearestName}">(${nearestName}${sign}${diff})</span>`;
           })()}</td>
           <td class="right">${(r.rate * 100).toFixed(2)}%</td>
-          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}</td>
+          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
         </tr>`;
       }).join('');
 
