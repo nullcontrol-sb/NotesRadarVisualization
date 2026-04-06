@@ -526,7 +526,7 @@
 
       const top10 = results.slice(0, 10);
       const avg = top10.length > 0
-        ? top10.reduce((s, r) => s + r.radarValue, 0) / top10.length
+        ? top10.reduce((s, r) => s + Math.floor(r.radarValue * 100) / 100, 0) / top10.length
         : 0;
       document.getElementById('avg-value').textContent =
         'Total：' + (Math.floor(avg * 100) / 100).toFixed(2);
