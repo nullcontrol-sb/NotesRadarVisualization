@@ -116,6 +116,26 @@
       padding: 0 20px;
     }
 
+    .view-tab-bar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    .view-tab-btn {
+      padding: 7px 18px;
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      color: #a0aec0;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .view-tab-btn:hover { background: #1e2a4a; color: #e2e8f0; }
+    .view-tab-btn.active { background: #e94560; color: #fff; border-color: #e94560; }
+
     .tab-bar {
       display: flex;
       gap: 4px;
@@ -279,6 +299,10 @@
   </div>
 
   <div class="result-section hidden" id="result-section">
+    <div class="view-tab-bar">
+      <button class="view-tab-btn active" id="view-tab-played"   onclick="switchView('played')">プレイ済み上位</button>
+      <button class="view-tab-btn"        id="view-tab-unplayed" onclick="switchView('unplayed')">未プレイ上位</button>
+    </div>
     <div class="tab-bar" id="tab-bar"></div>
     <div class="info-bar">
       <span id="info-text"></span>
@@ -286,17 +310,7 @@
     </div>
     <div class="table-wrapper">
       <table>
-        <thead>
-          <tr>
-            <th style="width:40px">#</th>
-            <th class="left">タイトル</th>
-            <th>難易度</th>
-            <th>☆</th>
-            <th>EXスコア</th>
-            <th>スコアレート</th>
-            <th>レーダー値</th>
-          </tr>
-        </thead>
+        <thead id="thead"></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
@@ -316,10 +330,12 @@
     ];
 
     // radarMapByType: { NOTES: Map, CHORD: Map, ... }
-    let radarMapByType = {};
-    let resultsByType  = {};
-    let scoreRows      = null;
-    let activeTab      = 'NOTES';
+    let radarMapByType  = {};
+    let resultsByType   = {};
+    let unplayedByType  = {};
+    let scoreRows       = null;
+    let activeTab       = 'NOTES';
+    let viewMode        = 'played'; // 'played' | 'unplayed'
 
     // ── タブ生成 ─────────────────────────────
     const tabBar = document.getElementById('tab-bar');
@@ -370,7 +386,7 @@
             const notes = parseInt(row['ノーツ数']);
             const max   = parseFloat(row['MAX']);
             if (!title || !diff || isNaN(notes) || isNaN(max)) continue;
-            map.set(`${title}::${diff}`, { notes, max });
+            map.set(`${title}::${diff}`, { notes, max, rawTitle: (row['タイトル'] || '').trim() });
           }
           radarMapByType[type] = map;
         }
@@ -475,13 +491,35 @@
       if (!scoreRows || Object.keys(radarMapByType).length === 0) return;
       hideError();
 
-      resultsByType = {};
+      resultsByType  = {};
+      unplayedByType = {};
+
+      // スコアCSVから プレイ済みセット と レベルマップ を構築
+      const playedSet = new Set();
+      const levelMap  = new Map(); // titleKey::diffAbbr → level
+      for (const row of scoreRows) {
+        const rawTitle = (row['タイトル'] || '').trim();
+        if (!rawTitle) continue;
+        const tk = titleKey(rawTitle);
+        for (const diff of DIFF_MAP) {
+          const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
+          const level     = row[`${diff.full} 難易度`] || '';
+          const key       = `${tk}::${diff.abbr}`;
+          if (level) levelMap.set(key, level);
+          const score = parseInt(row[`${diff.full} スコア`]);
+          if (clearType !== 'NO PLAY' && clearType !== '' && !isNaN(score) && score > 0) {
+            playedSet.add(key);
+          }
+        }
+      }
 
       for (const type of RADAR_TYPES) {
         const radarMap = radarMapByType[type];
         if (!radarMap || radarMap.size === 0) continue;
 
-        const results = [];
+        const results   = [];
+        const unplayed  = [];
+
         for (const row of scoreRows) {
           const rawTitle = (row['タイトル'] || '').trim();
           if (!rawTitle) continue;
@@ -505,8 +543,21 @@
           }
         }
 
+        // 未プレイ: レーダーマップにあってplayedSetにない組み合わせ
+        for (const [key, radar] of radarMap) {
+          if (playedSet.has(key)) continue;
+          const [tk, diffAbbr] = key.split('::');
+          const diffEntry = DIFF_MAP.find(d => d.abbr === diffAbbr);
+          if (!diffEntry) continue;
+          const level = levelMap.get(key) || '';
+          const maxEx = radar.notes * 2;
+          unplayed.push({ title: radar.rawTitle || tk, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
+        }
+
         results.sort((a, b) => b.radarValue - a.radarValue);
-        resultsByType[type] = results;
+        unplayed.sort((a, b) => b.radarMax - a.radarMax);
+        resultsByType[type]  = results;
+        unplayedByType[type] = unplayed;
       }
 
       if (Object.keys(resultsByType).length === 0) {
@@ -578,10 +629,28 @@
       return { level: currentLevel, nearestName: nearest.name, diff };
     }
 
+    // ── ビューモード切替 ─────────────────────
+    function switchView(mode) {
+      viewMode = mode;
+      document.getElementById('view-tab-played').classList.toggle('active',   mode === 'played');
+      document.getElementById('view-tab-unplayed').classList.toggle('active', mode === 'unplayed');
+      renderCurrentTab();
+    }
+
     // ── 描画 ─────────────────────────────────
     function renderCurrentTab() {
+      if (viewMode === 'unplayed') { renderUnplayedTab(); return; }
+
       const results = resultsByType[activeTab];
       if (!results) return;
+
+      document.getElementById('thead').innerHTML = `<tr>
+        <th style="width:40px">#</th>
+        <th class="left">タイトル</th>
+        <th>難易度</th><th>☆</th>
+        <th>EXスコア</th><th>スコアレート</th><th>レーダー値</th>
+      </tr>`;
+      document.getElementById('avg-value').style.display = '';
 
       const top20 = results.slice(0, 20);
       const top10threshold = results.length >= 10 ? results[9].radarValue : null;
@@ -629,6 +698,49 @@
         : 0;
       document.getElementById('avg-value').textContent =
         'Total：' + (Math.floor(avg * 100) / 100).toFixed(2);
+    }
+
+    function renderUnplayedTab() {
+      const unplayed = unplayedByType[activeTab];
+      if (!unplayed) return;
+
+      document.getElementById('thead').innerHTML = `<tr>
+        <th style="width:40px">#</th>
+        <th class="left">タイトル</th>
+        <th>難易度</th><th>☆</th>
+        <th>MAXレーダー値</th>
+      </tr>`;
+      document.getElementById('avg-value').style.display = 'none';
+
+      const top10played    = resultsByType[activeTab] || [];
+      const top10threshold = top10played.length >= 10 ? top10played[9].radarValue : null;
+      const top10 = unplayed.slice(0, 10);
+
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = top10.map((r, i) => {
+        const rank      = i + 1;
+        const rankClass = rank <= 3 ? `rank-${rank}` : '';
+        const medal     = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+
+        let guidanceHtml = '';
+        if (top10threshold !== null) {
+          const targetScore  = Math.floor(top10threshold * r.maxEx / r.radarMax) + 1;
+          const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
+          const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
+          guidanceHtml = `<br><span style="color:#fc8181;font-weight:600;font-size:11px;">${nearestName}${sign}${diff}以上でTOP10入り</span>`;
+        }
+
+        return `<tr class="${rankClass}">
+          <td class="rank center">${medal}</td>
+          <td class="title" title="${escHtml(r.title)}">${escHtml(r.title)}</td>
+          <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
+          <td class="center">${r.level ? '☆' + r.level : '—'}</td>
+          <td class="radar">${(Math.floor(r.radarMax * 100) / 100).toFixed(2)}${guidanceHtml}</td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('info-text').textContent =
+        `${activeTab} — 未プレイ: ${unplayed.length.toLocaleString()} 件 → 上位 10 件表示`;
     }
 
     function showError(msg) {
