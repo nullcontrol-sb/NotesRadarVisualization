@@ -32,12 +32,9 @@
     }
 
     .upload-section {
-      max-width: 860px;
+      max-width: 480px;
       margin: 32px auto 0;
       padding: 0 20px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
     }
 
     .upload-card {
@@ -80,6 +77,38 @@
       color: #68d391;
       min-height: 18px;
     }
+
+    .radar-status {
+      max-width: 480px;
+      margin: 16px auto 0;
+      padding: 0 20px;
+    }
+
+    .radar-status-inner {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 12px;
+      color: #a0aec0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .radar-status-inner.ok    { border-color: #38a169; color: #68d391; }
+    .radar-status-inner.error { border-color: #e94560; color: #fc8181; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #a0aec0;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     .result-section {
       max-width: 960px;
@@ -188,15 +217,6 @@
   </div>
 
   <div class="upload-section">
-    <div class="upload-card" id="card-radar">
-      <div class="upload-icon">📊</div>
-      <h3>notes_radar.csv</h3>
-      <p>app.py で出力したCSV</p>
-      <label for="input-radar">ファイルを選択</label>
-      <input type="file" id="input-radar" accept=".csv">
-      <div class="file-name" id="name-radar"></div>
-    </div>
-
     <div class="upload-card" id="card-score">
       <div class="upload-icon">🎮</div>
       <h3>スコアCSV</h3>
@@ -204,6 +224,13 @@
       <label for="input-score">ファイルを選択</label>
       <input type="file" id="input-score" accept=".csv">
       <div class="file-name" id="name-score"></div>
+    </div>
+  </div>
+
+  <div class="radar-status">
+    <div class="radar-status-inner" id="radar-status">
+      <span class="spinner" id="radar-spinner"></span>
+      <span id="radar-status-text">ノーツレーダーデータを読み込み中…</span>
     </div>
   </div>
 
@@ -235,23 +262,49 @@
   </div>
 
   <script>
+    const SHEETS_CSV_URL =
+      'https://docs.google.com/spreadsheets/d/1If1uzZZY5zL0ZFXC394JsnggNX0fvkBmiGNpBSZvGOM/export?format=csv&gid=711426838';
+
     const DIFF_MAP = [
-      { full: 'BEGINNER',   abbr: 'B' },
-      { full: 'NORMAL',     abbr: 'N' },
-      { full: 'HYPER',      abbr: 'H' },
-      { full: 'ANOTHER',    abbr: 'A' },
-      { full: 'LEGGENDARIA',abbr: 'L' },
+      { full: 'BEGINNER',    abbr: 'B' },
+      { full: 'NORMAL',      abbr: 'N' },
+      { full: 'HYPER',       abbr: 'H' },
+      { full: 'ANOTHER',     abbr: 'A' },
+      { full: 'LEGGENDARIA', abbr: 'L' },
     ];
 
     let radarRows = null;
     let scoreRows = null;
-    let radarHeaders = null;
-    let scoreHeaders = null;
 
-    // ── ファイル読み込み ─────────────────────
+    // ── レーダーデータ取得 ────────────────────
+    function setRadarStatus(state, text) {
+      const el = document.getElementById('radar-status');
+      const sp = document.getElementById('radar-spinner');
+      const tx = document.getElementById('radar-status-text');
+      el.className = 'radar-status-inner' + (state ? ' ' + state : '');
+      sp.style.display = state === 'loading' ? '' : 'none';
+      tx.textContent = text;
+    }
+
+    async function fetchRadarData() {
+      setRadarStatus('loading', 'ノーツレーダーデータを読み込み中…');
+      try {
+        const res = await fetch(SHEETS_CSV_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        const { rows } = parseCSV(text);
+        radarRows = rows;
+        setRadarStatus('ok', `✔ ノーツレーダーデータ読み込み完了 (${rows.length} 件)`);
+        tryCalculate();
+      } catch (e) {
+        setRadarStatus('error', '✖ ノーツレーダーデータの取得に失敗しました。スプレッドシートの共有設定を確認してください。');
+      }
+    }
+
+    // ── スコアファイル読み込み ────────────────
     function setupUpload(inputId, cardId, nameId, onLoad) {
-      const input = document.getElementById(inputId);
-      const card  = document.getElementById(cardId);
+      const input  = document.getElementById(inputId);
+      const card   = document.getElementById(cardId);
       const nameEl = document.getElementById(nameId);
 
       input.addEventListener('change', e => {
@@ -279,21 +332,13 @@
       reader.readAsText(file, 'UTF-8');
     }
 
-    setupUpload('input-radar', 'card-radar', 'name-radar', text => {
-      const { headers, rows } = parseCSV(text);
-      radarHeaders = headers;
-      radarRows = rows;
-    });
-
     setupUpload('input-score', 'card-score', 'name-score', text => {
-      const { headers, rows } = parseCSV(text);
-      scoreHeaders = headers;
+      const { rows } = parseCSV(text);
       scoreRows = rows;
     });
 
     // ── CSV パース ───────────────────────────
     function parseCSV(text) {
-      // BOM除去
       if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
       const lines = text.trim().split(/\r?\n/);
       const headers = splitLine(lines[0]);
@@ -329,7 +374,6 @@
       if (!radarRows || !scoreRows) return;
       hideError();
 
-      // notes_radar ルックアップ: "タイトル::abbr" -> {notes, max}
       const radarMap = new Map();
       for (const row of radarRows) {
         if ((row['SP/DP'] || '').trim() !== 'SP') continue;
@@ -342,7 +386,7 @@
       }
 
       if (radarMap.size === 0) {
-        showError('notes_radar.csv を正しく読み込めませんでした。列名を確認してください。');
+        showError('スプレッドシートのデータを正しく読み込めませんでした。列名を確認してください。');
         return;
       }
 
@@ -419,6 +463,9 @@
         .replace(/&/g,'&amp;').replace(/</g,'&lt;')
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
+
+    // ── 起動時にレーダーデータ取得 ────────────
+    fetchRadarData();
   </script>
 </body>
 </html>
