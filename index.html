@@ -349,7 +349,7 @@
           const map = new Map();
           for (const row of rows) {
             if ((row['SP/DP'] || '').trim() !== 'SP') continue;
-            const title = (row['タイトル'] || '').trim();
+            const title = normalizeTitle(row['タイトル'] || '');
             const diff  = (row['難易度']   || '').trim();
             const notes = parseInt(row['ノーツ数']);
             const max   = parseFloat(row['MAX']);
@@ -403,6 +403,16 @@
       scoreRows = rows;
     });
 
+    // ── タイトル正規化 ────────────────────────
+    function normalizeTitle(title) {
+      return title
+        .trim()
+        .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u301D\u301E\u301F\uFF02]/g, '"')
+        .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07]/g, "'")
+        .replace(/\u3000/g, ' ')
+        .normalize('NFC');
+    }
+
     // ── CSV パース ───────────────────────────
     function parseCSV(text) {
       if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
@@ -448,8 +458,9 @@
 
         const results = [];
         for (const row of scoreRows) {
-          const title = (row['タイトル'] || '').trim();
-          if (!title) continue;
+          const rawTitle = (row['タイトル'] || '').trim();
+          if (!rawTitle) continue;
+          const title = normalizeTitle(rawTitle);
 
           for (const diff of DIFF_MAP) {
             const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
@@ -464,7 +475,7 @@
 
             const rate       = score / (radar.notes * 2);
             const radarValue = rate * radar.max;
-            results.push({ title, diffFull: diff.full, diffAbbr: diff.abbr, level, score, rate, radarValue });
+            results.push({ title: rawTitle, diffFull: diff.full, diffAbbr: diff.abbr, level, score, rate, radarValue });
           }
         }
 
