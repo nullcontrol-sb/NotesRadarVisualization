@@ -447,9 +447,12 @@
         .normalize('NFC');
     }
 
-    // マップキー用：引用符を除去して照合の揺れを吸収
+    // マップキー用：NFKC正規化＋記号・区切り文字を除去して照合の揺れを吸収
+    // †♥～！？等のCSV間エンコーディング差異を吸収するため文字・数字以外を全除去
     function titleKey(title) {
-      return normalizeTitle(title).replace(/["""'']/g, '');
+      return normalizeTitle(title)
+        .normalize('NFKC')               // 全角→半角など互換正規化
+        .replace(/[^\p{L}\p{N}]/gu, ''); // 文字・数字以外を除去
     }
 
     // ── CSV パース ───────────────────────────
