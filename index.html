@@ -349,7 +349,7 @@
           const map = new Map();
           for (const row of rows) {
             if ((row['SP/DP'] || '').trim() !== 'SP') continue;
-            const title = normalizeTitle(row['タイトル'] || '');
+            const title = titleKey(row['タイトル'] || '');
             const diff  = (row['難易度']   || '').trim();
             const notes = parseInt(row['ノーツ数']);
             const max   = parseFloat(row['MAX']);
@@ -413,6 +413,11 @@
         .normalize('NFC');
     }
 
+    // マップキー用：引用符を除去して照合の揺れを吸収
+    function titleKey(title) {
+      return normalizeTitle(title).replace(/["""'']/g, '');
+    }
+
     // ── CSV パース ───────────────────────────
     function parseCSV(text) {
       if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
@@ -433,8 +438,10 @@
       for (let i = 0; i < line.length; i++) {
         const c = line[i];
         if (c === '"') {
-          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
-          else inQ = !inQ;
+          if (inQ && line[i+1] === '"') { cur += '"'; i++; } // エスケープ済み ""
+          else if (inQ) { inQ = false; }                      // 閉じクォート
+          else if (cur === '') { inQ = true; }                // フィールド先頭の開きクォート
+          else { cur += c; }                                  // 非クォートフィールド内のリテラル "
         } else if (c === ',' && !inQ) {
           result.push(cur); cur = '';
         } else {
@@ -460,7 +467,7 @@
         for (const row of scoreRows) {
           const rawTitle = (row['タイトル'] || '').trim();
           if (!rawTitle) continue;
-          const title = normalizeTitle(rawTitle);
+          const title = titleKey(rawTitle);
 
           for (const diff of DIFF_MAP) {
             const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
