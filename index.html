@@ -529,7 +529,7 @@
         ? top10.reduce((s, r) => s + r.radarValue, 0) / top10.length
         : 0;
       document.getElementById('avg-value').textContent =
-        (Math.floor(avg * 100) / 100).toFixed(2);
+        'Total：' + (Math.floor(avg * 100) / 100).toFixed(2);
     }
 
     function showError(msg) {
