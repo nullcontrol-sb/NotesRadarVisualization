@@ -396,7 +396,7 @@
           <td class="center">${r.level ? '☆' + r.level : '—'}</td>
           <td class="right">${r.score.toLocaleString()}</td>
           <td class="right">${(r.rate * 100).toFixed(2)}%</td>
-          <td class="radar">${r.radarValue.toFixed(2)}</td>
+          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}</td>
         </tr>`;
       }).join('');
 
