@@ -517,6 +517,12 @@
     }
 
     // ── DJ LEVEL 算出 ────────────────────────
+    const DJ_LEVEL_ORDER = ['MAX', 'MAX-', 'AAA', 'AA', 'A', 'B', 'C', 'D', 'E', 'F'];
+    function oneLevelBelow(name) {
+      const idx = DJ_LEVEL_ORDER.indexOf(name);
+      return idx >= 0 && idx < DJ_LEVEL_ORDER.length - 1 ? DJ_LEVEL_ORDER[idx + 1] : 'F';
+    }
+
     const DJ_LEVELS = [
       { name: 'AAA', frac: 8 },
       { name: 'AA',  frac: 7 },
@@ -603,7 +609,9 @@
           <td class="right">${(() => {
             const { level, nearestName, diff } = getDJLevelInfo(r.score, r.maxEx);
             const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
-            return `${r.score.toLocaleString()}<br><span class="dj-info dj-${nearestName}">(${nearestName}${sign}${diff})</span>`;
+            const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX')
+              ? oneLevelBelow(nearestName) : nearestName;
+            return `${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>`;
           })()}</td>
           <td class="right">${(r.rate * 100).toFixed(2)}%</td>
           <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
