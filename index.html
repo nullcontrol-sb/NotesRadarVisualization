@@ -266,7 +266,7 @@
     <div class="tab-bar" id="tab-bar"></div>
     <div class="info-bar">
       <span id="info-text"></span>
-      <span class="formula">算出値 ＝ EXスコア ÷ (ノーツ数×2) × レーダーMAX値</span>
+      <strong id="avg-value" style="font-size:15px;color:#a0d8ef;"></strong>
     </div>
     <div class="table-wrapper">
       <table>
@@ -505,6 +505,13 @@
 
       document.getElementById('info-text').textContent =
         `${activeTab} — 算出対象: ${results.length.toLocaleString()} 件 → 上位 20 件表示`;
+
+      const top10 = results.slice(0, 10);
+      const avg = top10.length > 0
+        ? top10.reduce((s, r) => s + r.radarValue, 0) / top10.length
+        : 0;
+      document.getElementById('avg-value').textContent =
+        (Math.floor(avg * 100) / 100).toFixed(2);
     }
 
     function showError(msg) {
