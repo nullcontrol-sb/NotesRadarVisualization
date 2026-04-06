@@ -224,9 +224,11 @@
     .badge-A { background: #5a4a1e; color: #f6ad55; }
     .badge-L { background: #3d2d5a; color: #b794f4; }
 
-    .dj-info { font-size: 11px; font-weight: 600; }
-    .dj-AAA  { color: #ffd700; }
-    .dj-AA   { color: #a0d8ef; }
+    .dj-info  { font-size: 11px; font-weight: 600; }
+    .dj-MAX   { color: #ffffff; text-shadow: 0 0 6px #fff; }
+    .dj-MAX-  { color: #ffe4b5; }
+    .dj-AAA   { color: #ffd700; }
+    .dj-AA    { color: #a0d8ef; }
     .dj-A    { color: #b794f4; }
     .dj-B    { color: #68d391; }
     .dj-C    { color: #63b3ed; }
@@ -526,7 +528,13 @@
     ];
 
     function getDJLevelInfo(score, maxEx) {
-      const thresholds = DJ_LEVELS.map(l => ({ name: l.name, value: Math.ceil(maxEx * l.frac / 9) }));
+      const aaaValue  = Math.ceil(maxEx * 8 / 9);
+      const maxMinus  = Math.ceil((aaaValue + maxEx) / 2);
+      const thresholds = [
+        { name: 'MAX',  value: maxEx },
+        { name: 'MAX-', value: maxMinus },
+        ...DJ_LEVELS.map(l => ({ name: l.name, value: Math.ceil(maxEx * l.frac / 9) })),
+      ];
 
       let currentLevel = 'F';
       for (const t of thresholds) {
