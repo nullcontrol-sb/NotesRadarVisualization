@@ -542,6 +542,16 @@
         if (score >= t.value) { currentLevel = t.name; break; }
       }
 
+      // MAX- ゾーン: 表示は常に MAX(満点) からの距離 (MAX-X)
+      if (currentLevel === 'MAX-') {
+        return { level: 'MAX-', nearestName: 'MAX', diff: score - maxEx };
+      }
+
+      // MAX(満点): 差分0
+      if (currentLevel === 'MAX') {
+        return { level: 'MAX', nearestName: 'MAX', diff: 0 };
+      }
+
       // MAX/MAX- は到達済みの場合のみ最近傍候補に含める
       const candidates = allThresholds.filter(t => {
         if (t.name === 'MAX'  && score < maxEx)    return false;
