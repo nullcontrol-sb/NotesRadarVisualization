@@ -213,7 +213,7 @@
     tbody tr.out-of-top10:nth-child(even) { background: #131b2e; }
     tbody tr.out-of-top10 td { color: #6b7280; }
     tbody tr.out-of-top10:hover { background: #1a2233 !important; }
-    tbody tr.selected { background: #1a3a5c !important; outline: 1px solid #4a90d9; }
+    tbody tr.selected { background: #0e3a6e !important; box-shadow: inset 3px 0 0 #60a5fa; }
 
     tbody td {
       padding: 10px 14px;
@@ -734,7 +734,7 @@
           }
         }
 
-        return `<tr class="${rankClass}${dimClass}">
+        return `<tr class="${rankClass}${dimClass}" data-row-key="${escHtml(r.title + '::' + r.diffAbbr)}">
           <td class="rank center">${medal}</td>
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
@@ -750,6 +750,7 @@
           <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
         </tr>`;
       }).join('');
+      applySelectedRows();
 
       document.getElementById('info-text').textContent =
         `${activeTab} — 算出対象: ${results.length.toLocaleString()} 件 → 上位 20 件表示`;
@@ -794,7 +795,7 @@
           }
         }
 
-        return `<tr class="${rankClass}">
+        return `<tr class="${rankClass}" data-row-key="${escHtml(r.title + '::' + r.diffAbbr)}">
           <td class="rank center">${medal}</td>
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
@@ -802,16 +803,33 @@
           <td class="radar">${(Math.floor(r.radarMax * 100) / 100).toFixed(2)}${guidanceHtml}</td>
         </tr>`;
       }).join('');
+      applySelectedRows();
 
       document.getElementById('info-text').textContent =
         `${activeTab} — 未プレイ: ${unplayed.length.toLocaleString()} 件 → 上位 10 件表示`;
     }
 
-    // ── 行選択（タップ/クリックでトグル）────────────────
+    // ── 行選択（タップ/クリックでトグル・localStorage永続化）────────────────
+    const SELECTED_KEY = 'nrv_selected_rows';
+    let selectedRows = new Set(JSON.parse(localStorage.getItem(SELECTED_KEY) || '[]'));
+
+    function saveSelectedRows() {
+      localStorage.setItem(SELECTED_KEY, JSON.stringify([...selectedRows]));
+    }
+    function applySelectedRows() {
+      document.querySelectorAll('#tbody tr[data-row-key]').forEach(tr => {
+        tr.classList.toggle('selected', selectedRows.has(tr.dataset.rowKey));
+      });
+    }
+
     document.getElementById('tbody').addEventListener('click', e => {
-      const tr = e.target.closest('tr');
+      const tr = e.target.closest('tr[data-row-key]');
       if (!tr) return;
-      tr.classList.toggle('selected');
+      const key = tr.dataset.rowKey;
+      if (selectedRows.has(key)) selectedRows.delete(key);
+      else selectedRows.add(key);
+      tr.classList.toggle('selected', selectedRows.has(key));
+      saveSelectedRows();
     });
 
     function showError(msg) {
