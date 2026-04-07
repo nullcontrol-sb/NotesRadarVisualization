@@ -729,6 +729,9 @@
       const nameEl = document.getElementById('name-score');
       nameEl.textContent = '✔ ' + label;
       document.getElementById('card-score').classList.add('loaded');
+      if (typeof gtag === 'function') {
+        gtag('event', 'csv_import', { method: label });
+      }
       tryCalculate();
     }
 
