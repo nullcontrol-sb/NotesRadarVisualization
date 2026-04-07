@@ -415,10 +415,30 @@
     }
     .modal-section a { color: #63b3ed; }
     .modal-img {
-      width: 100%;
+      width: 48%;
       border-radius: 8px;
       margin-top: 10px;
       border: 1px solid #0f3460;
+      cursor: zoom-in;
+      display: block;
+    }
+
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img {
+      max-width: 95vw;
+      max-height: 95vh;
+      border-radius: 8px;
+      object-fit: contain;
     }
 
     @media (max-width: 940px) {
@@ -516,6 +536,10 @@
 
   <div class="help-link-bar">
     <a id="open-help">使い方</a>
+  </div>
+
+  <div class="lightbox" id="lightbox">
+    <img id="lightbox-img" src="" alt="">
   </div>
 
   <div class="modal-overlay" id="modal-overlay">
@@ -1156,6 +1180,18 @@
     document.getElementById('open-help').addEventListener('click', () => modalOverlay.classList.add('open'));
     document.getElementById('modal-close').addEventListener('click', () => modalOverlay.classList.remove('open'));
     modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('open'); });
+
+    // ── ライトボックス ─────────────────────────
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightbox-img');
+    document.querySelectorAll('.modal-img').forEach(img => {
+      img.addEventListener('click', e => {
+        e.stopPropagation();
+        lightboxImg.src = img.src;
+        lightbox.classList.add('open');
+      });
+    });
+    lightbox.addEventListener('click', () => lightbox.classList.remove('open'));
   </script>
 </body>
 </html>
