@@ -796,7 +796,7 @@
           <td class="rank center">${medal}</td>
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
-          <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
+          <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : r.level === '0' ? '—' : '楽曲未プレイ'}</td>
           <td class="radar">${(Math.floor(r.radarMax * 100) / 100).toFixed(2)}${guidanceHtml}</td>
         </tr>`;
       }).join('');
