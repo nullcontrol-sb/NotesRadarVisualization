@@ -78,6 +78,57 @@
       min-height: 18px;
     }
 
+    .load-alt-btns {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+    .load-alt-btn {
+      padding: 7px 14px;
+      background: #0f3460;
+      border: 1px solid #1a4a7a;
+      border-radius: 8px;
+      color: #a0d8ef;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .load-alt-btn:hover { background: #1e4a8a; color: #e2e8f0; }
+
+    .paste-area {
+      margin-top: 12px;
+      display: none;
+    }
+    .paste-area.open { display: block; }
+    .paste-area textarea {
+      width: 100%;
+      height: 110px;
+      background: #0f1e3a;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 11px;
+      padding: 8px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    .paste-area textarea::placeholder { color: #4a5568; }
+    .paste-load-btn {
+      margin-top: 6px;
+      width: 100%;
+      padding: 8px;
+      background: #e94560;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .paste-load-btn:hover { background: #ff6b81; }
+
     .radar-status {
       max-width: 480px;
       margin: 16px auto 0;
@@ -297,6 +348,14 @@
       <p>e-amusement から出力したSPスコアデータ</p>
       <label for="input-score">ファイルを選択</label>
       <input type="file" id="input-score" accept=".csv">
+      <div class="load-alt-btns">
+        <button class="load-alt-btn" id="btn-clipboard">クリップボードから読み込む</button>
+        <button class="load-alt-btn" id="btn-toggle-paste">テキストを貼り付け</button>
+      </div>
+      <div class="paste-area" id="paste-area">
+        <textarea id="paste-textarea" placeholder="CSVの内容をここに貼り付けてください…"></textarea>
+        <button class="paste-load-btn" id="btn-paste-load">読み込む</button>
+      </div>
       <div class="file-name" id="name-score"></div>
     </div>
   </div>
@@ -461,22 +520,52 @@
       });
     }
 
+    function loadScoreText(text, label) {
+      const { rows } = parseCSV(text);
+      scoreRows = rows;
+      localStorage.setItem('scoreCSV',     text);
+      localStorage.setItem('scoreCSVName', label);
+      const nameEl = document.getElementById('name-score');
+      nameEl.textContent = '✔ ' + label;
+      document.getElementById('card-score').classList.add('loaded');
+      tryCalculate();
+    }
+
     function readFile(file, nameEl, card, onLoad) {
       const reader = new FileReader();
       reader.onload = e => {
-        nameEl.textContent = '✔ ' + file.name;
-        card.classList.add('loaded');
-        localStorage.setItem('scoreCSV',      e.target.result);
-        localStorage.setItem('scoreCSVName',  file.name);
         onLoad(e.target.result);
-        tryCalculate();
       };
       reader.readAsText(file, 'UTF-8');
     }
 
     setupUpload('input-score', 'card-score', 'name-score', text => {
-      const { rows } = parseCSV(text);
-      scoreRows = rows;
+      loadScoreText(text, 'アップロードファイル');
+    });
+
+    // クリップボードから読み込む
+    document.getElementById('btn-clipboard').addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (!text.trim()) { alert('クリップボードにテキストがありません。'); return; }
+        loadScoreText(text, 'クリップボード');
+      } catch {
+        alert('クリップボードへのアクセスが許可されていません。\nブラウザの設定を確認してください。');
+      }
+    });
+
+    // テキスト貼り付けトグル
+    document.getElementById('btn-toggle-paste').addEventListener('click', () => {
+      document.getElementById('paste-area').classList.toggle('open');
+    });
+
+    // テキストボックスから読み込む
+    document.getElementById('btn-paste-load').addEventListener('click', () => {
+      const text = document.getElementById('paste-textarea').value;
+      if (!text.trim()) { alert('テキストが空です。'); return; }
+      loadScoreText(text, 'テキスト貼り付け');
+      document.getElementById('paste-area').classList.remove('open');
+      document.getElementById('paste-textarea').value = '';
     });
 
     // ── タイトル正規化 ────────────────────────
