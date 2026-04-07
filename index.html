@@ -351,6 +351,63 @@
 
     .hidden { display: none; }
 
+    .help-link-bar {
+      text-align: center;
+      padding: 16px 0 8px;
+    }
+    .help-link-bar a {
+      color: #a0aec0;
+      font-size: 12px;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .help-link-bar a:hover { color: #e2e8f0; }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 14px;
+      max-width: 560px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 24px 20px 20px;
+      position: relative;
+    }
+    .modal-close {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      background: none;
+      border: none;
+      color: #a0aec0;
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modal-close:hover { color: #e2e8f0; }
+    .modal-box h2 { font-size: 14px; color: #a0d8ef; margin-bottom: 14px; }
+    .modal-section { margin-bottom: 16px; }
+    .modal-section h3 { font-size: 13px; color: #a0d8ef; margin-bottom: 8px; }
+    .modal-section p {
+      font-size: 12px;
+      color: #e2e8f0;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    .modal-section a { color: #63b3ed; }
+
     @media (max-width: 940px) {
       table { font-size: 12px; }
       thead th { padding: 8px 6px; }
@@ -441,6 +498,41 @@
         <thead id="thead"></thead>
         <tbody id="tbody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <div class="help-link-bar">
+    <a id="open-help">使い方</a>
+  </div>
+
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <button class="modal-close" id="modal-close">✕</button>
+      <div class="modal-section">
+        <h3>■使い方</h3>
+        <p>・ノーツレーダー値を伸ばしたいときに、ターゲットとする曲を絞り込む使い方を想定しています。
+・CSVを読み込むことで各ノーツレーダー値の上位20件を出力します。11位以下はTOP10入りまでに必要な点数が表示されます。
+・また、未プレイ曲をMAXノーツレーダー値が高い順に、TOP10入りに必要なスコアと共に20件出力します。
+・各行をタップ/クリックするとハイライト表示できます。ターゲットにする曲を判別しやすくできます。
+　「選択全解除」ボタンでハイライト表示を一括解除できます。</p>
+      </div>
+      <div class="modal-section">
+        <h3>■注意事項</h3>
+        <p>・現状SPのみ対応しています。
+・読み込んだデータはブラウザのキャッシュで保持されます。
+・PC/スマホ両方に対応しています。曲別のスコアレートはPCサイズでのみ表示されます。
+・各ノーツレーダー値はノーツレーダーbotさん(<a href="https://x.com/NotesRadarBot" target="_blank" rel="noopener">@NotesRadarBot</a>)のデータを基に出力しています。
+・各曲のノーツレーダー値反映は手動の為、最新曲や値の更新にラグがあります。</p>
+      </div>
+      <div class="modal-section">
+        <h3>■免責事項</h3>
+        <p>・ソースの状況によっては正しい値が出ない可能性があります。
+・表記ゆれや特殊文字の対応は目についたもののみ行っている為、正しく出力されないデータがある可能性があります。
+・メンテナンスや機能改修を当方の都合で行う場合があります。
+・トラブル等により予告なく本ツールを削除する場合があります。
+・本アプリは個人のAI学習の過程で、当方が使用する為に作成したツールをカスタマイズして公開したものです。
+　あくまで自身のユースケースを想定している為、必要な情報が得られない場合もあると思いますがご容赦ください。</p>
+      </div>
     </div>
   </div>
 
@@ -1037,6 +1129,12 @@
     }
 
     fetchRadarData();
+
+    // ── 使い方モーダル ─────────────────────────
+    const modalOverlay = document.getElementById('modal-overlay');
+    document.getElementById('open-help').addEventListener('click', () => modalOverlay.classList.add('open'));
+    document.getElementById('modal-close').addEventListener('click', () => modalOverlay.classList.remove('open'));
+    modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('open'); });
   </script>
 </body>
 </html>
