@@ -204,6 +204,7 @@
     tbody tr {
       border-bottom: 1px solid #0f3460;
       transition: background 0.15s;
+      cursor: pointer;
     }
     tbody tr:nth-child(odd)  { background: #16213e; }
     tbody tr:nth-child(even) { background: #1a2444; }
@@ -212,6 +213,7 @@
     tbody tr.out-of-top10:nth-child(even) { background: #131b2e; }
     tbody tr.out-of-top10 td { color: #6b7280; }
     tbody tr.out-of-top10:hover { background: #1a2233 !important; }
+    tbody tr.selected { background: #1a3a5c !important; outline: 1px solid #4a90d9; }
 
     tbody td {
       padding: 10px 14px;
@@ -804,6 +806,13 @@
       document.getElementById('info-text').textContent =
         `${activeTab} — 未プレイ: ${unplayed.length.toLocaleString()} 件 → 上位 10 件表示`;
     }
+
+    // ── 行選択（タップ/クリックでトグル）────────────────
+    document.getElementById('tbody').addEventListener('click', e => {
+      const tr = e.target.closest('tr');
+      if (!tr) return;
+      tr.classList.toggle('selected');
+    });
 
     function showError(msg) {
       document.getElementById('error-msg').textContent = msg;
