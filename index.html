@@ -743,7 +743,8 @@
           if (pointsNeeded > 0 && targetScore <= r.maxEx) {
             const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
             const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
-            guidanceHtml = `<br><span style="color:#e2e8f0;font-weight:600;font-size:11px;">あと<span style="color:#fc8181;">${pointsNeeded.toLocaleString()}点(${nearestName}${sign}${diff})</span>以上でTOP10入り</span>`;
+            const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
+            guidanceHtml = `<br><span style="color:#e2e8f0;font-size:11px;">あと<strong>${pointsNeeded.toLocaleString()}点</strong><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>以上でTOP10入り</span>`;
           }
         }
 
@@ -804,7 +805,8 @@
           if (targetScore <= r.maxEx) {
             const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
             const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
-            guidanceHtml = `<br><span style="color:#e2e8f0;font-weight:600;font-size:11px;"><span style="color:#fc8181;">${nearestName}${sign}${diff}</span>以上でTOP10入り</span>`;
+            const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
+            guidanceHtml = `<br><span style="color:#e2e8f0;font-size:11px;"><span class="dj-info dj-${colorLevel}">${nearestName}${sign}${diff}</span>以上でTOP10入り</span>`;
           }
         }
 
