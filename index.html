@@ -455,8 +455,11 @@
       return title.trim().normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, '');
     }
     // loose: a-z/0-9/CJKのみ保持（CSV間の記号エンコーディング差異を吸収）
+    // NFKDで分解されないストローク付きラテン文字はASCII相当に変換してから除去
     function titleKeyLoose(title) {
       return title.trim().normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
+        .replace(/[øœ]/g, 'o').replace(/ł/g, 'l').replace(/đ/g, 'd')
+        .replace(/ħ/g, 'h').replace(/ŧ/g, 't').replace(/ŋ/g, 'n')
         .replace(/[^a-z0-9\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/gu, '');
     }
     function titleKey(title) { return titleKeyStrict(title); }
