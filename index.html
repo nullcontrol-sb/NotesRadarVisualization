@@ -755,9 +755,11 @@
         let guidanceHtml = '';
         if (top10threshold !== null) {
           const targetScore  = Math.floor(top10threshold * r.maxEx / r.radarMax) + 1;
-          const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
-          const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
-          guidanceHtml = `<br><span style="color:#fc8181;font-weight:600;font-size:11px;">${nearestName}${sign}${diff}以上でTOP10入り</span>`;
+          if (targetScore <= r.maxEx) {
+            const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
+            const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
+            guidanceHtml = `<br><span style="color:#fc8181;font-weight:600;font-size:11px;">${nearestName}${sign}${diff}以上でTOP10入り</span>`;
+          }
         }
 
         return `<tr class="${rankClass}">
