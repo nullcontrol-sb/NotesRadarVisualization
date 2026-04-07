@@ -352,16 +352,23 @@
     .hidden { display: none; }
 
     .help-link-bar {
-      text-align: center;
-      padding: 16px 0 8px;
+      max-width: 480px;
+      margin: 6px auto 0;
+      padding: 0 20px;
     }
     .help-link-bar a {
-      color: #a0aec0;
-      font-size: 12px;
-      text-decoration: underline;
+      display: block;
+      padding: 12px 18px;
+      background: #16213e;
+      border: 2px solid #0f3460;
+      border-radius: 14px;
+      color: #a0d8ef;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
       cursor: pointer;
     }
-    .help-link-bar a:hover { color: #e2e8f0; }
+    .help-link-bar a:hover { background: #1e2a4a; color: #e2e8f0; }
 
     .modal-overlay {
       display: none;
