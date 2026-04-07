@@ -378,20 +378,23 @@
 
         for (const { type, text } of results) {
           const { rows } = parseCSV(text);
-          const map = new Map();
+          const strictMap = new Map();
+          const looseMap  = new Map();
           for (const row of rows) {
             if ((row['SP/DP'] || '').trim() !== 'SP') continue;
-            const title = titleKey(row['タイトル'] || '');
-            const diff  = (row['難易度']   || '').trim();
-            const notes = parseInt(row['ノーツ数']);
-            const max   = parseFloat(row['MAX']);
-            if (!title || !diff || isNaN(notes) || isNaN(max)) continue;
-            map.set(`${title}::${diff}`, { notes, max, rawTitle: (row['タイトル'] || '').trim() });
+            const rawTitle = (row['タイトル'] || '').trim();
+            const diff     = (row['難易度']   || '').trim();
+            const notes    = parseInt(row['ノーツ数']);
+            const max      = parseFloat(row['MAX']);
+            if (!rawTitle || !diff || isNaN(notes) || isNaN(max)) continue;
+            const entry = { notes, max, rawTitle };
+            strictMap.set(`${titleKeyStrict(rawTitle)}::${diff}`, entry);
+            looseMap.set(`${titleKeyLoose(rawTitle)}::${diff}`, entry);
           }
-          radarMapByType[type] = map;
+          radarMapByType[type] = { strict: strictMap, loose: looseMap };
         }
 
-        const total = Object.values(radarMapByType).reduce((s, m) => s + m.size, 0);
+        const total = Object.values(radarMapByType).reduce((s, m) => s + m.strict.size, 0);
         setRadarStatus('ok', `✔ ノーツレーダーデータ読み込み完了 (全6種 ${total.toLocaleString()} 件)`);
         tryCalculate();
       } catch (e) {
@@ -447,16 +450,16 @@
         .normalize('NFC');
     }
 
-    // マップキー用：ASCII英数字・ひらがな・カタカナ・漢字のみ保持
-    // CSV間でコードポイントが揺れやすい記号・特殊ラテン文字等は全て除去して照合する
-    function titleKey(title) {
-      return title
-        .trim()
-        .normalize('NFKD')          // 互換分解 (全角→半角, Ü→U+combining等)
-        .replace(/\p{M}/gu, '')     // combining mark 除去 (Ü→U, Ø→O等)
-        .toLowerCase()
+    // strict: 記号を保持（≡+≡など記号主体タイトルに対応）
+    function titleKeyStrict(title) {
+      return title.trim().normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, '');
+    }
+    // loose: a-z/0-9/CJKのみ保持（CSV間の記号エンコーディング差異を吸収）
+    function titleKeyLoose(title) {
+      return title.trim().normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
         .replace(/[^a-z0-9\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/gu, '');
     }
+    function titleKey(title) { return titleKeyStrict(title); }
 
     // ── CSV パース ───────────────────────────
     function parseCSV(text) {
@@ -500,34 +503,41 @@
       resultsByType  = {};
       unplayedByType = {};
 
-      // レベルマップをスコアCSVから構築 (titleKey::diffAbbr → level)
+      // レベルマップをスコアCSVから構築 (titleKeyLoose::diffAbbr → level)
       const levelMap = new Map();
+      // スコアCSVのプレイ済みlooseセット（radar未マッチでも判定に使う）
+      const scoreLoosePlayedSet = new Set();
       for (const row of scoreRows) {
         const rawTitle = (row['タイトル'] || '').trim();
         if (!rawTitle) continue;
-        const tk = titleKey(rawTitle);
+        const tk = titleKeyLoose(rawTitle);
         for (const diff of DIFF_MAP) {
-          const level = row[`${diff.full} 難易度`] || '';
+          const level     = row[`${diff.full} 難易度`] || '';
+          const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
+          const score     = parseInt(row[`${diff.full} スコア`]);
           if (level) levelMap.set(`${tk}::${diff.abbr}`, level);
+          if (clearType !== 'NO PLAY' && clearType !== '' && !isNaN(score) && score > 0) {
+            scoreLoosePlayedSet.add(`${tk}::${diff.abbr}`);
+          }
         }
       }
 
-      // 第1パス: resultsByType を構築
+      // 第1パス: resultsByType を構築 (strict→looseの順でフォールバック)
       for (const type of RADAR_TYPES) {
-        const radarMap = radarMapByType[type];
-        if (!radarMap || radarMap.size === 0) continue;
+        const maps = radarMapByType[type];
+        if (!maps || maps.strict.size === 0) continue;
         const results = [];
         for (const row of scoreRows) {
           const rawTitle = (row['タイトル'] || '').trim();
           if (!rawTitle) continue;
-          const title = titleKey(rawTitle);
           for (const diff of DIFF_MAP) {
             const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
             if (clearType === 'NO PLAY' || clearType === '') continue;
             const score = parseInt(row[`${diff.full} スコア`]);
             if (isNaN(score) || score <= 0) continue;
             const level = row[`${diff.full} 難易度`] || '';
-            const radar = radarMap.get(`${title}::${diff.abbr}`);
+            const radar = maps.strict.get(`${titleKeyStrict(rawTitle)}::${diff.abbr}`)
+                       || maps.loose.get(`${titleKeyLoose(rawTitle)}::${diff.abbr}`);
             if (!radar || radar.notes <= 0) continue;
             const maxEx      = radar.notes * 2;
             const rate       = score / maxEx;
@@ -540,25 +550,27 @@
       }
 
       // 第2パス: unplayedByType を構築
-      // playedSet はマッチング済み results から生成し、タイトル照合ズレを回避する
       for (const type of RADAR_TYPES) {
-        const radarMap = radarMapByType[type];
-        if (!radarMap || radarMap.size === 0) continue;
+        const maps = radarMapByType[type];
+        if (!maps || maps.strict.size === 0) continue;
 
-        const playedSet = new Set(
-          (resultsByType[type] || []).map(r => `${titleKey(r.title)}::${r.diffAbbr}`)
+        // strict played: マッチング済み results から
+        const strictPlayedSet = new Set(
+          (resultsByType[type] || []).map(r => `${titleKeyStrict(r.title)}::${r.diffAbbr}`)
         );
 
         const unplayed = [];
-        for (const [key, radar] of radarMap) {
-          if (playedSet.has(key)) continue;
-          const sepIdx    = key.lastIndexOf('::');
-          const diffAbbr  = key.slice(sepIdx + 2);
+        for (const [strictKey, radar] of maps.strict) {
+          const sepIdx   = strictKey.lastIndexOf('::');
+          const diffAbbr = strictKey.slice(sepIdx + 2);
+          const looseKey = `${titleKeyLoose(radar.rawTitle)}::${diffAbbr}`;
+          // strict または loose で一致すれば played とみなす
+          if (strictPlayedSet.has(strictKey) || scoreLoosePlayedSet.has(looseKey)) continue;
           const diffEntry = DIFF_MAP.find(d => d.abbr === diffAbbr);
           if (!diffEntry) continue;
-          const level = levelMap.get(key) || '';
+          const level = levelMap.get(looseKey) || '';
           const maxEx = radar.notes * 2;
-          unplayed.push({ title: radar.rawTitle || key.slice(0, sepIdx), diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
+          unplayed.push({ title: radar.rawTitle, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
         }
 
         unplayed.sort((a, b) => b.radarMax - a.radarMax);
