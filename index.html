@@ -456,7 +456,7 @@
         .normalize('NFKD')                   // 互換分解 (Ü→U+combining, ！→!等)
         .replace(/\p{M}/gu, '')              // combining mark 除去 (Ü→U)
         .toLowerCase()
-        .replace(/[\p{Po}\p{So}]/gu, '')     // Other Punctuation/Symbol 除去 (†♥！？等)
+        .replace(/[\p{P}\p{So}]/gu, '')       // 全句読点/Other Symbol 除去 (†♥！？""等)
         .replace(/\s+/g, '');                // 空白除去
     }
 
