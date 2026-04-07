@@ -323,6 +323,22 @@
 
     .hidden { display: none; }
 
+    @media (max-width: 640px) {
+      table { font-size: 12px; }
+      thead th { padding: 8px 6px; }
+      tbody td { padding: 8px 6px; white-space: normal; }
+      tbody td.title {
+        max-width: none;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+        word-break: break-word;
+      }
+      .col-rate { display: none; }
+      .badge { font-size: 10px; padding: 2px 6px; }
+      .dj-info { font-size: 10px; }
+    }
+
     .error-msg {
       color: #fc8181;
       background: #2d1515;
@@ -812,7 +828,7 @@
         <th style="width:40px">#</th>
         <th class="left">タイトル</th>
         <th>難易度</th><th>☆</th>
-        <th>EXスコア</th><th>スコアレート</th><th>レーダー値</th>
+        <th>EXスコア</th><th class="col-rate">スコアレート</th><th>レーダー値</th>
       </tr>`;
       document.getElementById('avg-value').style.display = '';
 
@@ -849,7 +865,7 @@
               ? oneLevelBelow(nearestName) : nearestName;
             return `${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>`;
           })()}</td>
-          <td class="right">${(r.rate * 100).toFixed(2)}%</td>
+          <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
           <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
         </tr>`;
       }).join('');
