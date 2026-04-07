@@ -447,16 +447,16 @@
         .normalize('NFC');
     }
 
-    // マップキー用：NFKD正規化＋ダイアクリティカル除去＋記号除去で照合揺れを吸収
-    // Ü→U、†♥～！？等のCSV間差異を吸収する
+    // マップキー用：NFKD正規化＋ダイアクリティカル除去＋スペース除去で照合揺れを吸収
+    // Ü→U、全角→半角、大文字小文字を正規化。≡等の記号はキーとして保持する。
     function titleKey(title) {
       return title
         .trim()
         .replace(/\u3000/g, ' ')
-        .normalize('NFKD')               // 互換分解 (Ü→U+combining, 全角→半角等)
-        .replace(/\p{M}/gu, '')          // combining mark (ダイアクリティカル) を除去
+        .normalize('NFKD')      // 互換分解 (Ü→U+combining, 全角→半角等)
+        .replace(/\p{M}/gu, '') // combining mark (ダイアクリティカル) を除去
         .toLowerCase()
-        .replace(/[^\p{L}\p{N}]/gu, ''); // 文字・数字以外を除去
+        .replace(/\s+/g, '');   // 空白のみ除去（記号は保持）
     }
 
     // ── CSV パース ───────────────────────────
