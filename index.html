@@ -33,7 +33,7 @@
 
     .upload-section {
       max-width: 480px;
-      margin: 32px auto 0;
+      margin: 8px auto 0;
       padding: 0 20px;
     }
 
@@ -41,10 +41,36 @@
       background: #16213e;
       border: 2px dashed #0f3460;
       border-radius: 14px;
-      padding: 28px 20px;
-      text-align: center;
+      overflow: hidden;
       transition: border-color 0.2s, background 0.2s;
     }
+
+    .upload-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .upload-header h3 {
+      font-size: 13px;
+      color: #a0d8ef;
+      margin: 0;
+    }
+    .upload-chevron {
+      color: #a0aec0;
+      font-size: 12px;
+      transition: transform 0.2s;
+    }
+    .upload-card.open .upload-chevron { transform: rotate(180deg); }
+
+    .upload-body {
+      display: none;
+      padding: 0 20px 20px;
+      text-align: center;
+    }
+    .upload-card.open .upload-body { display: block; }
     .upload-card.drag-over {
       border-color: #e94560;
       background: #1e2a4a;
@@ -366,20 +392,24 @@
 
   <div class="upload-section">
     <div class="upload-card" id="card-score">
-      <div class="upload-icon">🎮</div>
-      <h3>スコアCSVインポート</h3>
-      <p><a href="https://p.eagate.573.jp/game/2dx/33/djdata/score_download.html" target="_blank" rel="noopener" style="color:#a0d8ef;">e-amusement</a> から出力したSPスコアデータをインポートしてください<br>・ファイルアップロード(ドラッグ&amp;ドロップ可)<br>・テキスト読み込み(クリップボード読み込み可)<br>に対応しています</p>
-      <label for="input-score">CSVファイルを選択</label>
-      <input type="file" id="input-score" accept=".csv">
-      <div class="load-alt-btns">
-        <button class="load-alt-btn" id="btn-clipboard">クリップボードから読み込む</button>
-        <button class="load-alt-btn" id="btn-toggle-paste">テキストを貼り付け</button>
+      <div class="upload-header" id="upload-header">
+        <h3>スコアCSVインポート</h3>
+        <span class="upload-chevron">▼</span>
       </div>
-      <div class="paste-area" id="paste-area">
-        <textarea id="paste-textarea" placeholder="CSVの内容をここに貼り付けてください…"></textarea>
-        <button class="paste-load-btn" id="btn-paste-load">読み込む</button>
+      <div class="upload-body">
+        <p style="font-size:12px;color:#a0aec0;margin-bottom:14px;"><a href="https://p.eagate.573.jp/game/2dx/33/djdata/score_download.html" target="_blank" rel="noopener" style="color:#a0d8ef;">e-amusement</a> から出力したSPスコアデータをインポートしてください<br>・ファイルアップロード(ドラッグ&amp;ドロップ可)<br>・テキスト読み込み(クリップボード読み込み可)<br>に対応しています</p>
+        <label for="input-score">CSVファイルを選択</label>
+        <input type="file" id="input-score" accept=".csv">
+        <div class="load-alt-btns">
+          <button class="load-alt-btn" id="btn-clipboard">クリップボードから読み込む</button>
+          <button class="load-alt-btn" id="btn-toggle-paste">テキストを貼り付け</button>
+        </div>
+        <div class="paste-area" id="paste-area">
+          <textarea id="paste-textarea" placeholder="CSVの内容をここに貼り付けてください…"></textarea>
+          <button class="paste-load-btn" id="btn-paste-load">読み込む</button>
+        </div>
+        <div class="file-name" id="name-score"></div>
       </div>
-      <div class="file-name" id="name-score"></div>
     </div>
   </div>
 
@@ -564,6 +594,11 @@
 
     setupUpload('input-score', 'card-score', 'name-score', text => {
       loadScoreText(text, 'アップロードファイル');
+    });
+
+    // インポート領域の折りたたみトグル
+    document.getElementById('upload-header').addEventListener('click', () => {
+      document.getElementById('card-score').classList.toggle('open');
     });
 
     // クリップボードから読み込む
@@ -983,13 +1018,16 @@
     // キャッシュからスコアデータを復元
     const cachedCSV  = localStorage.getItem('scoreCSV');
     const cachedName = localStorage.getItem('scoreCSVName');
+    const card = document.getElementById('card-score');
     if (cachedCSV) {
       const { rows } = parseCSV(cachedCSV);
       scoreRows = rows;
-      const nameEl = document.getElementById('name-score');
-      const card   = document.getElementById('card-score');
-      nameEl.textContent = '✔ ' + cachedName + '（キャッシュ）';
+      document.getElementById('name-score').textContent = '✔ ' + cachedName + '（キャッシュ）';
       card.classList.add('loaded');
+      // キャッシュあり → 閉じた状態で開始
+    } else {
+      // キャッシュなし → 開いた状態で開始
+      card.classList.add('open');
     }
 
     fetchRadarData();
