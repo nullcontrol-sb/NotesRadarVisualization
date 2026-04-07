@@ -338,6 +338,8 @@
       .col-rate { display: none; }
       .tab-bar { gap: 2px; flex-wrap: nowrap; }
       .tab-btn { padding: 6px 0; font-size: 11px; letter-spacing: 0; flex: 1; text-align: center; }
+      .info-bar { font-size: 11px; gap: 6px; }
+      #avg-value { font-size: 13px !important; }
       .diff-full { display: none; }
       .diff-abbr { display: inline; }
       .badge { font-size: 10px; padding: 2px 6px; }
@@ -401,7 +403,7 @@
     <div class="tab-bar" id="tab-bar"></div>
     <div class="info-bar">
       <span id="info-text"></span>
-      <strong id="avg-value" style="font-size:15px;color:#a0d8ef;"></strong>
+      <strong id="avg-value" style="font-size:15px;color:#a0d8ef;white-space:nowrap;"></strong>
     </div>
     <div class="table-wrapper">
       <table>
@@ -877,7 +879,7 @@
       applySelectedRows();
 
       document.getElementById('info-text').textContent =
-        `${activeTab} — 算出対象: ${results.length.toLocaleString()} 件 → 上位 20 件表示`;
+        `${activeTab} — 上位 20 件表示`;
 
       const top10 = results.slice(0, 10);
       const avg = top10.length > 0
@@ -931,7 +933,7 @@
       applySelectedRows();
 
       document.getElementById('info-text').textContent =
-        `${activeTab} — 未プレイ: ${unplayed.length.toLocaleString()} 件 → 上位 20 件表示`;
+        `${activeTab} — 上位 20 件表示`;
     }
 
     // ── 行選択（タップ/クリックでトグル・localStorage永続化）────────────────
