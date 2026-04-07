@@ -879,7 +879,7 @@
       applySelectedRows();
 
       document.getElementById('info-text').textContent =
-        `${activeTab} — 上位 20 件表示`;
+        `${activeTab} — プレイ済み上位 20 件表示`;
 
       const top10 = results.slice(0, 10);
       const avg = top10.length > 0
@@ -933,7 +933,7 @@
       applySelectedRows();
 
       document.getElementById('info-text').textContent =
-        `${activeTab} — 上位 20 件表示`;
+        `${activeTab} — 未プレイ上位 20 件表示`;
     }
 
     // ── 行選択（タップ/クリックでトグル・localStorage永続化）────────────────
