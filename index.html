@@ -901,7 +901,7 @@
 
       const top10played    = resultsByType[activeTab] || [];
       const top10threshold = top10played.length >= 10 ? top10played[9].radarValue : null;
-      const top10 = unplayed.slice(0, 10);
+      const top10 = unplayed.slice(0, 20);
 
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = top10.map((r, i) => {
@@ -931,7 +931,7 @@
       applySelectedRows();
 
       document.getElementById('info-text').textContent =
-        `${activeTab} — 未プレイ: ${unplayed.length.toLocaleString()} 件 → 上位 10 件表示`;
+        `${activeTab} — 未プレイ: ${unplayed.length.toLocaleString()} 件 → 上位 20 件表示`;
     }
 
     // ── 行選択（タップ/クリックでトグル・localStorage永続化）────────────────
