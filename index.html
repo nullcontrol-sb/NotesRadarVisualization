@@ -135,6 +135,18 @@
     }
     .view-tab-btn:hover { background: #1e2a4a; color: #e2e8f0; }
     .view-tab-btn.active { background: #e94560; color: #fff; border-color: #e94560; }
+    .clear-selection-btn {
+      margin-left: auto;
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid #4a5568;
+      border-radius: 6px;
+      color: #718096;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .clear-selection-btn:hover { background: #1e2a4a; color: #e2e8f0; border-color: #a0aec0; }
 
     .tab-bar {
       display: flex;
@@ -304,6 +316,7 @@
     <div class="view-tab-bar">
       <button class="view-tab-btn active" id="view-tab-played"   onclick="switchView('played')">プレイ済み上位</button>
       <button class="view-tab-btn"        id="view-tab-unplayed" onclick="switchView('unplayed')">未プレイ上位</button>
+      <button class="clear-selection-btn" id="clear-selection-btn">選択全解除</button>
     </div>
     <div class="tab-bar" id="tab-bar"></div>
     <div class="info-bar">
@@ -821,6 +834,12 @@
         tr.classList.toggle('selected', selectedRows.has(tr.dataset.rowKey));
       });
     }
+
+    document.getElementById('clear-selection-btn').addEventListener('click', () => {
+      selectedRows.clear();
+      saveSelectedRows();
+      applySelectedRows();
+    });
 
     document.getElementById('tbody').addEventListener('click', e => {
       const tr = e.target.closest('tr[data-row-key]');
