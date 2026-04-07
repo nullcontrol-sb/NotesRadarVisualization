@@ -546,7 +546,7 @@
         }
 
         const total = Object.values(radarMapByType).reduce((s, m) => s + m.strict.size, 0);
-        setRadarStatus('ok', `✔ ノーツレーダーデータ読み込み完了 (全6種 ${total.toLocaleString()} 件)`);
+        setRadarStatus('ok', `✔ ノーツレーダーデータ読み込み完了`);
         tryCalculate();
       } catch (e) {
         setRadarStatus('error', '✖ 取得失敗: ' + e.message);
