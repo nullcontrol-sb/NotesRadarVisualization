@@ -322,7 +322,13 @@
     const RADAR_TYPES = ['NOTES', 'CHORD', 'PEAK', 'CHARGE', 'SCRATCH', 'SOF-LAN'];
 
     // 未プレイ一覧から除外するタイトル（rawTitle の完全一致）
-    const UNPLAYED_EXCLUDE = new Set(['デモーニッシュ']);
+    const UNPLAYED_EXCLUDE = new Set([
+      'デモーニッシュ',
+      '俺ら東京さ行ぐだ',
+      'Sweet Clapper',
+      'Please Welcome Mr.C',
+      'anthracene',
+    ]);
 
     const DIFF_MAP = [
       { full: 'BEGINNER',    abbr: 'B' },
