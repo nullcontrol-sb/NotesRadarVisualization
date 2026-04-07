@@ -308,6 +308,7 @@
     .badge-H { background: #5a2d2d; color: #fc8181; }
     .badge-A { background: #5a4a1e; color: #f6ad55; }
     .badge-L { background: #3d2d5a; color: #b794f4; }
+    .diff-abbr { display: none; }
 
     .dj-info  { font-size: 11px; font-weight: 600; }
     .dj-MAX   { color: #ffffff; text-shadow: 0 0 6px #fff; }
@@ -335,6 +336,8 @@
         word-break: break-word;
       }
       .col-rate { display: none; }
+      .diff-full { display: none; }
+      .diff-abbr { display: inline; }
       .badge { font-size: 10px; padding: 2px 6px; }
       .dj-info { font-size: 10px; }
     }
@@ -856,7 +859,7 @@
         return `<tr class="${rankClass}${dimClass}" data-row-key="${escHtml(r.title + '::' + r.diffAbbr)}">
           <td class="rank center">${medal}</td>
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
-          <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
+          <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
           <td class="right">${(() => {
             const { level, nearestName, diff } = getDJLevelInfo(r.score, r.maxEx);
@@ -918,7 +921,7 @@
         return `<tr class="${rankClass}" data-row-key="${escHtml(r.title + '::' + r.diffAbbr)}">
           <td class="rank center">${medal}</td>
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
-          <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
+          <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : r.level === '0' ? '譜面未解禁' : '楽曲未プレイ'}</td>
           <td class="radar">${(Math.floor(r.radarMax * 100) / 100).toFixed(2)}${guidanceHtml}</td>
         </tr>`;
