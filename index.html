@@ -578,6 +578,9 @@
       scoreRows = rows;
       localStorage.setItem('scoreCSV',     text);
       localStorage.setItem('scoreCSVName', label);
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+      localStorage.setItem('scoreCSVDate', dateStr);
       const nameEl = document.getElementById('name-score');
       nameEl.textContent = '✔ ' + label;
       document.getElementById('card-score').classList.add('loaded');
@@ -1022,7 +1025,9 @@
     if (cachedCSV) {
       const { rows } = parseCSV(cachedCSV);
       scoreRows = rows;
-      document.getElementById('name-score').textContent = '✔ ' + cachedName + '（キャッシュ）';
+      const cachedDate = localStorage.getItem('scoreCSVDate') || '';
+      const dateLabel = cachedDate ? ` 更新日：${cachedDate}` : '';
+      document.getElementById('name-score').textContent = '✔ ' + cachedName + `（キャッシュ${dateLabel}）`;
       card.classList.add('loaded');
       // キャッシュあり → 閉じた状態で開始
     } else {
