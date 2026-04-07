@@ -744,7 +744,7 @@
             const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
             const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
             const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
-            guidanceHtml = `<br><span style="color:#e2e8f0;font-size:11px;">あと<strong style="color:#fc8181;">${pointsNeeded.toLocaleString()}点</strong><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>以上でTOP10入り</span>`;
+            guidanceHtml = `<br><span style="color:#e2e8f0;font-size:11px;"><strong style="color:#fc8181;">+${pointsNeeded.toLocaleString()}点</strong><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>以上でTOP10入り</span>`;
           }
         }
 
