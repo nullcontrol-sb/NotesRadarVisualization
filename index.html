@@ -328,6 +328,14 @@
       ['0.59',  ["'.59", '.59']],  // スコアCSVは"0.59"、レーダーCSVは"'.59"
     ]);
 
+    // 表示名上書き: スコアCSVのタイトル → 正式な表示名
+    const TITLE_DISPLAY_OVERRIDE = new Map([
+      ['0.59', '.59'],
+    ]);
+    function displayTitle(rawTitle) {
+      return TITLE_DISPLAY_OVERRIDE.get(rawTitle) ?? rawTitle;
+    }
+
     // 未プレイ一覧から除外するタイトル（rawTitle の完全一致）
     const UNPLAYED_EXCLUDE = new Set([
       'デモーニッシュ',
@@ -726,7 +734,7 @@
 
         return `<tr class="${rankClass}${dimClass}">
           <td class="rank center">${medal}</td>
-          <td class="title" title="${escHtml(r.title)}">${escHtml(r.title)}</td>
+          <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
           <td class="right">${(() => {
@@ -786,7 +794,7 @@
 
         return `<tr class="${rankClass}">
           <td class="rank center">${medal}</td>
-          <td class="title" title="${escHtml(r.title)}">${escHtml(r.title)}</td>
+          <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}">${r.diffFull}</span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
           <td class="radar">${(Math.floor(r.radarMax * 100) / 100).toFixed(2)}${guidanceHtml}</td>
