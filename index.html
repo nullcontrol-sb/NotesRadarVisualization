@@ -743,7 +743,7 @@
           if (pointsNeeded > 0 && targetScore <= r.maxEx) {
             const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
             const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
-            guidanceHtml = `<br><span style="color:#fc8181;font-weight:600;font-size:11px;">あと<span style="color:#fff;font-size:13px;">${pointsNeeded.toLocaleString()}点(${nearestName}${sign}${diff})</span>以上でTOP10入り</span>`;
+            guidanceHtml = `<br><span style="color:#fff;font-weight:600;font-size:11px;">あと<span style="color:#fc8181;">${pointsNeeded.toLocaleString()}点(${nearestName}${sign}${diff})</span>以上でTOP10入り</span>`;
           }
         }
 
@@ -804,7 +804,7 @@
           if (targetScore <= r.maxEx) {
             const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
             const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
-            guidanceHtml = `<br><span style="color:#fc8181;font-weight:600;font-size:11px;"><span style="color:#fff;font-size:13px;">${nearestName}${sign}${diff}</span>以上でTOP10入り</span>`;
+            guidanceHtml = `<br><span style="color:#fff;font-weight:600;font-size:11px;"><span style="color:#fc8181;">${nearestName}${sign}${diff}</span>以上でTOP10入り</span>`;
           }
         }
 
