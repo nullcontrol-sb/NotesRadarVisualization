@@ -321,6 +321,9 @@
     const BASE_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
     const RADAR_TYPES = ['NOTES', 'CHORD', 'PEAK', 'CHARGE', 'SCRATCH', 'SOF-LAN'];
 
+    // 未プレイ一覧から除外するタイトル（rawTitle の完全一致）
+    const UNPLAYED_EXCLUDE = new Set(['デモーニッシュ']);
+
     const DIFF_MAP = [
       { full: 'BEGINNER',    abbr: 'B' },
       { full: 'NORMAL',      abbr: 'N' },
@@ -571,6 +574,7 @@
           if (strictPlayedSet.has(strictKey) || scoreLoosePlayedSet.has(looseKey)) continue;
           const diffEntry = DIFF_MAP.find(d => d.abbr === diffAbbr);
           if (!diffEntry) continue;
+          if (UNPLAYED_EXCLUDE.has(radar.rawTitle)) continue;
           const level = levelMap.get(looseKey) || '';
           const maxEx = radar.notes * 2;
           unplayed.push({ title: radar.rawTitle, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
