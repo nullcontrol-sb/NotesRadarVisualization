@@ -325,7 +325,7 @@
     // 通常の strict/loose マッチングで一致しない場合のフォールバック
     const TITLE_LOOKUP_EXTRA = new Map([
       ['fffff', ['ƒƒƒƒƒ']],   // レーダーCSVは ƒ (U+0192) を使用
-      ['.59',   ["'.59"]],    // レーダーCSVは先頭にアポストロフィあり
+      ['0.59',  ["'.59", '.59']],  // スコアCSVは"0.59"、レーダーCSVは"'.59"
     ]);
 
     // 未プレイ一覧から除外するタイトル（rawTitle の完全一致）
@@ -522,7 +522,6 @@
 
     // ── 計算 ─────────────────────────────────
     function tryCalculate() {
-      console.log('[DEBUG] tryCalculate called. scoreRows=', scoreRows ? scoreRows.length : null, 'radarKeys=', Object.keys(radarMapByType));
       if (!scoreRows || Object.keys(radarMapByType).length === 0) return;
       hideError();
 
@@ -553,14 +552,6 @@
         const maps = radarMapByType[type];
         if (!maps || maps.strict.size === 0) continue;
         const results = [];
-        // [DEBUG] スコアCSV内の .59 関連タイトルを探す（type=NOTESのみ）
-        if (type === 'NOTES') {
-          const candidates = scoreRows.filter(r => (r['タイトル'] || '').trim().includes('59'));
-          console.log('[DEBUG .59] score CSV candidates:', candidates.map(r => ({
-            title: r['タイトル'],
-            charCodes: [...(r['タイトル'] || '')].map(c => c.codePointAt(0).toString(16)),
-          })));
-        }
         for (const row of scoreRows) {
           const rawTitle = (row['タイトル'] || '').trim();
           if (!rawTitle) continue;
@@ -570,25 +561,17 @@
             const score = parseInt(row[`${diff.full} スコア`]);
             if (isNaN(score) || score <= 0) continue;
             const level = row[`${diff.full} 難易度`] || '';
-            const DEBUG_TITLE = '.59';
-            const isDebug = rawTitle === DEBUG_TITLE && type === 'NOTES';
-            const strictKey = `${titleKeyStrict(rawTitle)}::${diff.abbr}`;
-            const looseKey  = `${titleKeyLoose(rawTitle)}::${diff.abbr}`;
-            if (isDebug) console.log(`[DEBUG .59] diff=${diff.abbr} strictKey="${strictKey}" looseKey="${looseKey}" strictHit=${maps.strict.has(strictKey)} looseHit=${maps.loose.has(looseKey)}`);
-            const radar = maps.strict.get(strictKey)
-                       || maps.loose.get(looseKey)
+            const radar = maps.strict.get(`${titleKeyStrict(rawTitle)}::${diff.abbr}`)
+                       || maps.loose.get(`${titleKeyLoose(rawTitle)}::${diff.abbr}`)
                        || (() => {
                          const extras = TITLE_LOOKUP_EXTRA.get(rawTitle);
-                         if (isDebug) console.log(`[DEBUG .59] TITLE_LOOKUP_EXTRA extras=`, extras);
                          if (!extras) return undefined;
                          for (const alt of extras) {
                            const r = maps.strict.get(`${titleKeyStrict(alt)}::${diff.abbr}`)
                                   || maps.loose.get(`${titleKeyLoose(alt)}::${diff.abbr}`);
-                           if (isDebug) console.log(`[DEBUG .59] alt="${alt}" strictAlt="${titleKeyStrict(alt)}::${diff.abbr}" hit=${!!r}`);
                            if (r) return r;
                          }
                        })();
-            if (isDebug) console.log(`[DEBUG .59] radar=`, radar);
             if (!radar || radar.notes <= 0) continue;
             const maxEx      = radar.notes * 2;
             const rate       = score / maxEx;
