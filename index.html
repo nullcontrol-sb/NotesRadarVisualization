@@ -226,8 +226,20 @@
     }
     .view-tab-btn:hover { background: #1e2a4a; color: #e2e8f0; }
     .view-tab-btn.active { background: #e94560; color: #fff; border-color: #e94560; }
-    .clear-selection-btn {
+    .hide-alts-label {
       margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: #718096;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .hide-alts-label input[type="checkbox"] { cursor: pointer; accent-color: #e94560; }
+    .clear-selection-btn {
+      margin-left: 0;
       padding: 7px 14px;
       background: transparent;
       border: 1px solid #4a5568;
@@ -542,6 +554,7 @@
     <div class="view-tab-bar">
       <button class="view-tab-btn active" id="view-tab-played"   onclick="switchView('played')">プレイ済み上位</button>
       <button class="view-tab-btn"        id="view-tab-unplayed" onclick="switchView('unplayed')">未プレイ上位</button>
+      <label class="hide-alts-label"><input type="checkbox" id="hide-alts-cb">ランクイン楽曲の別難易度を表示しない</label>
       <button class="clear-selection-btn" id="clear-selection-btn">選択全解除</button>
     </div>
     <div class="tab-bar" id="tab-bar"></div>
@@ -1116,11 +1129,13 @@
         </tr>`;
       }
 
+      const hideAlts = document.getElementById('hide-alts-cb').checked;
+
       const rows = [];
       // TOP10 (代表)
       repTop10.forEach((r, i) => rows.push(makeRow(r, i + 1, '')));
       // 弾き出されたエントリ (同タイトル代表との差分ガイダンス付き)
-      displaced.forEach(r => {
+      if (!hideAlts) displaced.forEach(r => {
         const rep = repMap.get(r.title);
         const guidanceHtml = makeGuidanceHtml(r, rep ? rep.radarValue : null, true);
         const { nearestName, diff: djDiff } = getDJLevelInfo(r.score, r.maxEx);
@@ -1137,10 +1152,13 @@
         </tr>`);
       });
       // 11位以降 (代表・非代表どちらも含む)
-      bottomEntries.forEach((r, i) => {
-        const rank = i + 11;
-        // 非代表の場合は同タイトル代表との比較、代表はTOP10閾値との比較
+      let bottomRank = 11;
+      bottomEntries.forEach(r => {
         const isRep = repMap.get(r.title) === r;
+        // hideAlts ON かつ非代表はスキップ
+        if (hideAlts && !isRep) return;
+        const rank = bottomRank++;
+        // 非代表の場合は同タイトル代表との比較、代表はTOP10閾値との比較
         const guidanceThreshold = isRep ? top10threshold : (repMap.get(r.title)?.radarValue ?? null);
         const guidanceHtml = makeGuidanceHtml(r, guidanceThreshold, !isRep);
         const { nearestName, diff: djDiff } = getDJLevelInfo(r.score, r.maxEx);
@@ -1242,6 +1260,15 @@
         tr.classList.toggle('selected', selectedRows.has(tr.dataset.rowKey));
       });
     }
+
+    // ── 別難易度非表示チェックボックス ──────────
+    const HIDE_ALTS_KEY = 'nrv_hide_alts';
+    const hideAltsCb = document.getElementById('hide-alts-cb');
+    hideAltsCb.checked = localStorage.getItem(HIDE_ALTS_KEY) === '1';
+    hideAltsCb.addEventListener('change', () => {
+      localStorage.setItem(HIDE_ALTS_KEY, hideAltsCb.checked ? '1' : '0');
+      renderCurrentTab();
+    });
 
     document.getElementById('clear-selection-btn').addEventListener('click', () => {
       selectedRows.clear();
