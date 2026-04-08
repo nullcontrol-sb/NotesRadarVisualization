@@ -373,6 +373,10 @@
       margin: 24px auto 0;
       padding: 0 20px;
       text-align: center;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
     }
     .help-link-bar a {
       display: inline-block;
@@ -554,6 +558,27 @@
 
   <div class="help-link-bar">
     <a id="open-help">使い方</a>
+    <a id="open-release-notes">リリースノート</a>
+  </div>
+
+  <div class="modal-overlay" id="release-notes-overlay">
+    <div class="modal-box">
+      <button class="modal-close" id="release-notes-close">✕</button>
+      <div class="modal-section">
+        <h3>■リリースノート</h3>
+      </div>
+      <div class="modal-section">
+        <h3>〇2026/04/08</h3>
+        <p>・同一タイトル別難易度の考慮が漏れていた為修正。<br>
+└TOP10内に同一タイトル曲が複数入る場合、低い方を弾き出すようにしました。<br>
+　また、TOP10入りのスコア差分を同一タイトル曲と比較して算出するようにしました。<br>
+・リリースノートを追加しました。</p>
+      </div>
+      <div class="modal-section">
+        <h3>〇2026/04/07</h3>
+        <p>・リリース</p>
+      </div>
+    </div>
   </div>
 
   <div class="lightbox" id="lightbox">
@@ -1275,6 +1300,12 @@
     document.getElementById('open-help').addEventListener('click', () => modalOverlay.classList.add('open'));
     document.getElementById('modal-close').addEventListener('click', () => modalOverlay.classList.remove('open'));
     modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('open'); });
+
+    // ── リリースノートモーダル ─────────────────
+    const releaseNotesOverlay = document.getElementById('release-notes-overlay');
+    document.getElementById('open-release-notes').addEventListener('click', () => releaseNotesOverlay.classList.add('open'));
+    document.getElementById('release-notes-close').addEventListener('click', () => releaseNotesOverlay.classList.remove('open'));
+    releaseNotesOverlay.addEventListener('click', e => { if (e.target === releaseNotesOverlay) releaseNotesOverlay.classList.remove('open'); });
 
     // ── ライトボックス ─────────────────────────
     const lightbox = document.getElementById('lightbox');
