@@ -1063,7 +1063,7 @@
         return !repTop10Keys.has(key) && !displacedKeys.has(key);
       }).slice(0, 10);
 
-      function makeGuidanceHtml(r, thresholdRadarValue) {
+      function makeGuidanceHtml(r, thresholdRadarValue, showNote = false) {
         if (thresholdRadarValue === null) return '';
         const targetScore = Math.floor(thresholdRadarValue * r.maxEx / r.radarMax) + 1;
         const pointsNeeded = targetScore - r.score;
@@ -1071,7 +1071,8 @@
         const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
         const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
         const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
-        return `<br><span style="color:#e2e8f0;font-size:11px;"><strong style="color:#fc8181;">+${pointsNeeded.toLocaleString()}点</strong><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>以上でTOP10入り</span>`;
+        const note = showNote ? `<br><span style="color:#6b7280;font-size:10px;">※同一タイトル別難易度との差分</span>` : '';
+        return `<br><span style="color:#e2e8f0;font-size:11px;"><strong style="color:#fc8181;">+${pointsNeeded.toLocaleString()}点</strong><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>以上でTOP10入り</span>${note}`;
       }
 
       function makeRow(r, rankLabel, extraClass) {
@@ -1098,7 +1099,7 @@
       // 弾き出されたエントリ (同タイトル代表との差分ガイダンス付き)
       displaced.forEach(r => {
         const rep = repMap.get(r.title);
-        const guidanceHtml = makeGuidanceHtml(r, rep ? rep.radarValue : null);
+        const guidanceHtml = makeGuidanceHtml(r, rep ? rep.radarValue : null, true);
         const { nearestName, diff: djDiff } = getDJLevelInfo(r.score, r.maxEx);
         const sign = (djDiff >= 0 && nearestName !== 'MAX-') ? '+' : '';
         const colorLevel = (djDiff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
@@ -1118,7 +1119,7 @@
         // 非代表の場合は同タイトル代表との比較、代表はTOP10閾値との比較
         const isRep = repMap.get(r.title) === r;
         const guidanceThreshold = isRep ? top10threshold : (repMap.get(r.title)?.radarValue ?? null);
-        const guidanceHtml = makeGuidanceHtml(r, guidanceThreshold);
+        const guidanceHtml = makeGuidanceHtml(r, guidanceThreshold, !isRep);
         const { nearestName, diff: djDiff } = getDJLevelInfo(r.score, r.maxEx);
         const sign = (djDiff >= 0 && nearestName !== 'MAX-') ? '+' : '';
         const colorLevel = (djDiff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
