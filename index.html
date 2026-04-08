@@ -233,11 +233,10 @@
       align-items: center;
       gap: 8px;
     }
-    .options-toggle-btn { display: none; }
-    .options-panel {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    /* デスクトップ: トグルボタン非表示、パネルをインライン表示 */
+    @media (min-width: 941px) {
+      .options-toggle-btn { display: none; }
+      .options-panel { display: flex; align-items: center; gap: 8px; }
     }
     .hide-alts-label {
       display: flex;
@@ -489,8 +488,8 @@
     }
 
     @media (max-width: 940px) {
+      /* モバイル: トグルボタン表示、パネルはドロップダウン */
       .options-toggle-btn {
-        display: block;
         padding: 7px 12px;
         background: #16213e;
         border: 1px solid #0f3460;
