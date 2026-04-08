@@ -1166,6 +1166,8 @@
       for (const r of top10played) { if (!repMapPlayed.has(r.title)) repMapPlayed.set(r.title, r); }
       const repListPlayed = [...repMapPlayed.values()];
       const top10threshold = repListPlayed.length >= 10 ? repListPlayed[9].radarValue : null;
+      // TOP10内のタイトル集合（同一タイトル判定用）
+      const top10PlayedTitles = new Set(repListPlayed.slice(0, 10).map(r => r.title));
       const top10 = unplayed.slice(0, 20);
 
       const tbody = document.getElementById('tbody');
@@ -1174,14 +1176,20 @@
         const rankClass = rank <= 3 ? `rank-${rank}` : '';
         const medal     = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
 
+        // 同タイトルがTOP10入りしている場合はその曲との比較を優先
+        const sameTitlePlayed = repMapPlayed.get(r.title);
+        const isSameTitleInTop10 = sameTitlePlayed && top10PlayedTitles.has(r.title);
+        const threshold = isSameTitleInTop10 ? sameTitlePlayed.radarValue : top10threshold;
+
         let guidanceHtml = '';
-        if (top10threshold !== null) {
-          const targetScore  = Math.floor(top10threshold * r.maxEx / r.radarMax) + 1;
+        if (threshold !== null) {
+          const targetScore  = Math.floor(threshold * r.maxEx / r.radarMax) + 1;
           if (targetScore <= r.maxEx) {
             const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
             const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
             const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
-            guidanceHtml = `<br><span style="color:#e2e8f0;font-size:11px;"><span class="dj-info dj-${colorLevel}">${nearestName}${sign}${diff}</span>以上でTOP10入り</span>`;
+            const note = isSameTitleInTop10 ? `<br><span style="color:#6b7280;font-size:10px;">※同一タイトル別難易度との差分</span>` : '';
+            guidanceHtml = `<br><span style="color:#e2e8f0;font-size:11px;"><span class="dj-info dj-${colorLevel}">${nearestName}${sign}${diff}</span>以上でTOP10入り</span>${note}`;
           }
         }
 
