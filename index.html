@@ -316,6 +316,10 @@
     tbody tr.out-of-top10:nth-child(even) { background: #131b2e; }
     tbody tr.out-of-top10 td { color: #6b7280; }
     tbody tr.out-of-top10:hover { background: #1a2233 !important; }
+    tbody tr.displaced-row { background: #0d1117 !important; }
+    tbody tr.displaced-row td { color: #6b7280; }
+    tbody tr.displaced-row .rank { color: #4b5563; }
+    tbody tr.displaced-row:hover { background: #161b22 !important; }
     tbody tr.selected,
     tbody tr.selected:hover { background: #0e3a6e !important; box-shadow: inset 3px 0 0 #60a5fa; }
 
@@ -1032,51 +1036,103 @@
       </tr>`;
       document.getElementById('avg-value').style.display = '';
 
-      const top20 = results.slice(0, 20);
-      const top10threshold = results.length >= 10 ? results[9].radarValue : null;
-      const tbody = document.getElementById('tbody');
-      tbody.innerHTML = top20.map((r, i) => {
-        const rank = i + 1;
-        const rankClass = rank <= 3 ? `rank-${rank}` : '';
-        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-        const dimClass = rank > 10 ? ' out-of-top10' : '';
+      // タイトル重複排除: タイトルごとに最高radarValueの難易度を代表とする
+      const repMap = new Map(); // title → 代表エントリ
+      for (const r of results) {
+        if (!repMap.has(r.title)) repMap.set(r.title, r);
+      }
+      // 代表リスト (resultsがradarValue降順なので挿入順 = 降順)
+      const repList = [...repMap.values()];
 
-        let guidanceHtml = '';
-        if (rank > 10 && top10threshold !== null) {
-          const targetScore = Math.floor(top10threshold * r.maxEx / r.radarMax) + 1;
-          const pointsNeeded = targetScore - r.score;
-          if (pointsNeeded > 0 && targetScore <= r.maxEx) {
-            const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
-            const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
-            const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
-            guidanceHtml = `<br><span style="color:#e2e8f0;font-size:11px;"><strong style="color:#fc8181;">+${pointsNeeded.toLocaleString()}点</strong><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>以上でTOP10入り</span>`;
-          }
-        }
+      // TOP10の閾値は重複排除後のリストで決定
+      const top10threshold = repList.length >= 10 ? repList[9].radarValue : null;
 
-        return `<tr class="${rankClass}${dimClass}" data-row-key="${escHtml(r.title + '::' + r.diffAbbr)}">
+      // TOP10内タイトル集合
+      const top10RepTitles = new Set(repList.slice(0, 10).map(r => r.title));
+
+      // 弾き出されたエントリ: 代表でない & 同タイトルの代表がTOP10内
+      const displaced = results.filter(r => repMap.get(r.title) !== r && top10RepTitles.has(r.title));
+
+      // 表示行: [TOP10代表] + [弾き出し] + [11位以降代表]
+      const repTop10 = repList.slice(0, 10);
+      const repRest  = repList.slice(10, 20);
+
+      function makeGuidanceHtml(r, thresholdRadarValue) {
+        if (thresholdRadarValue === null) return '';
+        const targetScore = Math.floor(thresholdRadarValue * r.maxEx / r.radarMax) + 1;
+        const pointsNeeded = targetScore - r.score;
+        if (pointsNeeded <= 0 || targetScore > r.maxEx) return '';
+        const { nearestName, diff } = getDJLevelInfo(targetScore, r.maxEx);
+        const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
+        const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
+        return `<br><span style="color:#e2e8f0;font-size:11px;"><strong style="color:#fc8181;">+${pointsNeeded.toLocaleString()}点</strong><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>以上でTOP10入り</span>`;
+      }
+
+      function makeRow(r, rankLabel, extraClass) {
+        const rankNum = typeof rankLabel === 'number' ? rankLabel : null;
+        const rankClass = rankNum !== null && rankNum <= 3 ? `rank-${rankNum}` : '';
+        const medal = rankNum === 1 ? '🥇' : rankNum === 2 ? '🥈' : rankNum === 3 ? '🥉' : rankLabel;
+        const { level: djLevel, nearestName, diff } = getDJLevelInfo(r.score, r.maxEx);
+        const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
+        const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
+        return `<tr class="${rankClass}${extraClass ? ' ' + extraClass : ''}" data-row-key="${escHtml(r.title + '::' + r.diffAbbr)}">
           <td class="rank center">${medal}</td>
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
-          <td class="right">${(() => {
-            const { level, nearestName, diff } = getDJLevelInfo(r.score, r.maxEx);
-            const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
-            const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX')
-              ? oneLevelBelow(nearestName) : nearestName;
-            return `${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>`;
-          })()}</td>
+          <td class="right">${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span></td>
+          <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
+          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}</td>
+        </tr>`;
+      }
+
+      const rows = [];
+      // TOP10 (代表)
+      repTop10.forEach((r, i) => rows.push(makeRow(r, i + 1, '')));
+      // 弾き出されたエントリ (同タイトル代表との差分ガイダンス付き)
+      displaced.forEach(r => {
+        const rep = repMap.get(r.title);
+        const guidanceHtml = makeGuidanceHtml(r, rep ? rep.radarValue : null);
+        const { nearestName, diff: djDiff } = getDJLevelInfo(r.score, r.maxEx);
+        const sign = (djDiff >= 0 && nearestName !== 'MAX-') ? '+' : '';
+        const colorLevel = (djDiff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
+        rows.push(`<tr class="displaced-row" data-row-key="${escHtml(r.title + '::' + r.diffAbbr)}">
+          <td class="rank center">–</td>
+          <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
+          <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
+          <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
+          <td class="right">${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
           <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
           <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
-        </tr>`;
-      }).join('');
+        </tr>`);
+      });
+      // 11位以降 (代表)
+      repRest.forEach((r, i) => {
+        const rank = i + 11;
+        const guidanceHtml = makeGuidanceHtml(r, top10threshold);
+        const { nearestName, diff: djDiff } = getDJLevelInfo(r.score, r.maxEx);
+        const sign = (djDiff >= 0 && nearestName !== 'MAX-') ? '+' : '';
+        const colorLevel = (djDiff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
+        rows.push(`<tr class="out-of-top10" data-row-key="${escHtml(r.title + '::' + r.diffAbbr)}">
+          <td class="rank center">${rank}</td>
+          <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
+          <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
+          <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
+          <td class="right">${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
+          <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
+          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
+        </tr>`);
+      });
+
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = rows.join('');
       applySelectedRows();
 
       document.getElementById('info-text').textContent =
         `${activeTab} — プレイ済み上位 20 件表示`;
 
-      const top10 = results.slice(0, 10);
-      const avg = top10.length > 0
-        ? top10.reduce((s, r) => s + Math.floor(r.radarValue * 100) / 100, 0) / top10.length
+      const avg = repTop10.length > 0
+        ? repTop10.reduce((s, r) => s + Math.floor(r.radarValue * 100) / 100, 0) / repTop10.length
         : 0;
       document.getElementById('avg-value').textContent =
         'Total：' + (Math.floor(avg * 100) / 100).toFixed(2);
@@ -1094,8 +1150,12 @@
       </tr>`;
       document.getElementById('avg-value').style.display = 'none';
 
-      const top10played    = resultsByType[activeTab] || [];
-      const top10threshold = top10played.length >= 10 ? top10played[9].radarValue : null;
+      const top10played = resultsByType[activeTab] || [];
+      // 重複排除後のTOP10閾値で判定
+      const repMapPlayed = new Map();
+      for (const r of top10played) { if (!repMapPlayed.has(r.title)) repMapPlayed.set(r.title, r); }
+      const repListPlayed = [...repMapPlayed.values()];
+      const top10threshold = repListPlayed.length >= 10 ? repListPlayed[9].radarValue : null;
       const top10 = unplayed.slice(0, 20);
 
       const tbody = document.getElementById('tbody');
