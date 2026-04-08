@@ -1099,6 +1099,9 @@
         return !repTop10Keys.has(key) && !displacedKeys.has(key);
       }).slice(0, 10);
 
+      // hideAlts ON時: 代表のみで20件を補完するためのリスト
+      const repRest = repList.slice(10, 20);
+
       function makeGuidanceHtml(r, thresholdRadarValue, showNote = false) {
         if (thresholdRadarValue === null) return '';
         const targetScore = Math.floor(thresholdRadarValue * r.maxEx / r.radarMax) + 1;
@@ -1151,13 +1154,13 @@
           <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
         </tr>`);
       });
-      // 11位以降 (代表・非代表どちらも含む)
-      let bottomRank = 11;
-      bottomEntries.forEach(r => {
+      // 11位以降
+      // hideAlts ON: 代表のみの repRest を使い20曲まで補完
+      // hideAlts OFF: 代表・非代表混在の bottomEntries
+      const bottomList = hideAlts ? repRest : bottomEntries;
+      bottomList.forEach((r, i) => {
+        const rank = i + 11;
         const isRep = repMap.get(r.title) === r;
-        // hideAlts ON かつ非代表はスキップ
-        if (hideAlts && !isRep) return;
-        const rank = bottomRank++;
         // 非代表の場合は同タイトル代表との比較、代表はTOP10閾値との比較
         const guidanceThreshold = isRep ? top10threshold : (repMap.get(r.title)?.radarValue ?? null);
         const guidanceHtml = makeGuidanceHtml(r, guidanceThreshold, !isRep);
