@@ -683,6 +683,8 @@
     const BASE_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
     const RADAR_TYPES = ['NOTES', 'CHORD', 'PEAK', 'CHARGE', 'SCRATCH', 'SOF-LAN'];
 
+    const LEVEL_SUPPLEMENT_URL = 'https://docs.google.com/spreadsheets/d/1Bxkf59TJj17i5R_88j7e0ymhFUawQbpAjydeCjpsA4Q/gviz/tq?tqx=out:csv&gid=0';
+
     // タイトル照合例外: スコアCSVのタイトル → レーダーCSVで追加で試すタイトル候補
     // 通常の strict/loose マッチングで一致しない場合のフォールバック
     const TITLE_LOOKUP_EXTRA = new Map([
@@ -716,10 +718,11 @@
     ];
 
     // radarMapByType: { NOTES: Map, CHORD: Map, ... }
-    let radarMapByType  = {};
-    let resultsByType   = {};
-    let unplayedByType  = {};
-    let scoreRows       = null;
+    let radarMapByType      = {};
+    let supplementLevelMap  = new Map(); // titleKeyLoose::diffAbbr → level (補完CSV由来)
+    let resultsByType       = {};
+    let unplayedByType      = {};
+    let scoreRows           = null;
     let activeTab       = 'NOTES';
     let viewMode        = 'played'; // 'played' | 'unplayed'
 
@@ -751,18 +754,32 @@
       tx.textContent = text;
     }
 
+    // 補完レベルCSVの列名と DIFF_MAP の abbr の対応
+    const SUPPLEMENT_COL_MAP = [
+      { col: 'SP_B', abbr: 'B' },
+      { col: 'SP_N', abbr: 'N' },
+      { col: 'SP_H', abbr: 'H' },
+      { col: 'SP_A', abbr: 'A' },
+      { col: 'SP_L', abbr: 'L' },
+    ];
+
     async function fetchRadarData() {
       setRadarStatus('loading', 'ノーツレーダーデータを読み込み中…');
       try {
-        const results = await Promise.all(
-          RADAR_TYPES.map(type =>
-            fetch(BASE_URL + encodeURIComponent(type))
-              .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
-              .then(text => ({ type, text }))
-          )
-        );
+        const [radarResults, supplementText] = await Promise.all([
+          Promise.all(
+            RADAR_TYPES.map(type =>
+              fetch(BASE_URL + encodeURIComponent(type))
+                .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+                .then(text => ({ type, text }))
+            )
+          ),
+          fetch(LEVEL_SUPPLEMENT_URL)
+            .then(r => r.ok ? r.text() : Promise.resolve(''))
+            .catch(() => ''),
+        ]);
 
-        for (const { type, text } of results) {
+        for (const { type, text } of radarResults) {
           const { rows } = parseCSV(text);
           const strictMap = new Map();
           const looseMap  = new Map();
@@ -780,7 +797,21 @@
           radarMapByType[type] = { strict: strictMap, loose: looseMap };
         }
 
-        const total = Object.values(radarMapByType).reduce((s, m) => s + m.strict.size, 0);
+        // 補完レベルマップを構築
+        if (supplementText) {
+          const { rows: supRows } = parseCSV(supplementText);
+          supplementLevelMap = new Map();
+          for (const row of supRows) {
+            const rawTitle = (row['TITLE'] || '').trim();
+            if (!rawTitle) continue;
+            const tk = titleKeyLoose(rawTitle);
+            for (const { col, abbr } of SUPPLEMENT_COL_MAP) {
+              const level = (row[col] || '').trim();
+              if (level && level !== '-') supplementLevelMap.set(`${tk}::${abbr}`, level);
+            }
+          }
+        }
+
         setRadarStatus('ok', `✔ ノーツレーダーデータ読み込み完了`);
         tryCalculate();
       } catch (e) {
@@ -971,7 +1002,7 @@
             if (clearType === 'NO PLAY' || clearType === '') continue;
             const score = parseInt(row[`${diff.full} スコア`]);
             if (isNaN(score) || score <= 0) continue;
-            const level = row[`${diff.full} 難易度`] || '';
+            const level = row[`${diff.full} 難易度`] || supplementLevelMap.get(`${titleKeyLoose(rawTitle)}::${diff.abbr}`) || '';
             const radar = maps.strict.get(`${titleKeyStrict(rawTitle)}::${diff.abbr}`)
                        || maps.loose.get(`${titleKeyLoose(rawTitle)}::${diff.abbr}`)
                        || (() => {
@@ -1014,7 +1045,7 @@
           const diffEntry = DIFF_MAP.find(d => d.abbr === diffAbbr);
           if (!diffEntry) continue;
           if (UNPLAYED_EXCLUDE.has(radar.rawTitle)) continue;
-          const level = levelMap.get(looseKey) || '';
+          const level = levelMap.get(looseKey) || supplementLevelMap.get(looseKey) || '';
           const maxEx = radar.notes * 2;
           unplayed.push({ title: radar.rawTitle, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
         }
