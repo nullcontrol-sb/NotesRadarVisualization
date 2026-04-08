@@ -1206,15 +1206,19 @@
 
       const top10played = resultsByType[activeTab] || [];
       // 重複排除後のTOP10閾値で判定
-      const repMapPlayed = new Map();
-      for (const r of top10played) { if (!repMapPlayed.has(r.title)) repMapPlayed.set(r.title, r); }
+      // CSVごとに引用符等の表記が異なる場合に備えtitleKeyLooseで正規化したキーを使用
+      const repMapPlayed = new Map(); // looseKey → entry
+      for (const r of top10played) {
+        const key = titleKeyLoose(r.title);
+        if (!repMapPlayed.has(key)) repMapPlayed.set(key, r);
+      }
       const repListPlayed = [...repMapPlayed.values()];
       const top10threshold = repListPlayed.length >= 10 ? repListPlayed[9].radarValue : null;
-      // TOP10内のタイトル集合（同一タイトル判定用）
-      const top10PlayedTitles = new Set(repListPlayed.slice(0, 10).map(r => r.title));
+      // TOP10内のタイトル集合（looseKeyで保持）
+      const top10PlayedKeys = new Set(repListPlayed.slice(0, 10).map(r => titleKeyLoose(r.title)));
       const hideAlts = document.getElementById('hide-alts-cb').checked;
       const filteredUnplayed = hideAlts
-        ? unplayed.filter(r => !top10PlayedTitles.has(r.title))
+        ? unplayed.filter(r => !top10PlayedKeys.has(titleKeyLoose(r.title)))
         : unplayed;
       const top10 = filteredUnplayed.slice(0, 20);
 
@@ -1225,8 +1229,8 @@
         const medal     = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
 
         // 同タイトルがTOP10入りしている場合はその曲との比較を優先
-        const sameTitlePlayed = repMapPlayed.get(r.title);
-        const isSameTitleInTop10 = sameTitlePlayed && top10PlayedTitles.has(r.title);
+        const sameTitlePlayed = repMapPlayed.get(titleKeyLoose(r.title));
+        const isSameTitleInTop10 = sameTitlePlayed && top10PlayedKeys.has(titleKeyLoose(r.title));
         const threshold = isSameTitleInTop10 ? sameTitlePlayed.radarValue : top10threshold;
 
         let guidanceHtml = '';
