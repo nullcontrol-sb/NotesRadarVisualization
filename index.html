@@ -1212,7 +1212,11 @@
       const top10threshold = repListPlayed.length >= 10 ? repListPlayed[9].radarValue : null;
       // TOP10内のタイトル集合（同一タイトル判定用）
       const top10PlayedTitles = new Set(repListPlayed.slice(0, 10).map(r => r.title));
-      const top10 = unplayed.slice(0, 20);
+      const hideAlts = document.getElementById('hide-alts-cb').checked;
+      const filteredUnplayed = hideAlts
+        ? unplayed.filter(r => !top10PlayedTitles.has(r.title))
+        : unplayed;
+      const top10 = filteredUnplayed.slice(0, 20);
 
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = top10.map((r, i) => {
