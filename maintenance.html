@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>補完データ メンテナンスツール</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 0 0 48px;
+    }
+
+    .header {
+      background: #0f3460;
+      padding: 18px 24px 14px;
+      text-align: center;
+    }
+    .header h1 { color: #a0d8ef; font-size: 20px; font-weight: 700; }
+    .header p  { color: #a0aec0; font-size: 12px; margin-top: 4px; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 24px 20px 0; }
+
+    .status-box {
+      background: #16213e;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-box.ok     { border-left: 4px solid #38a169; }
+    .status-box.error  { border-left: 4px solid #e53e3e; }
+    .status-box.loading{ border-left: 4px solid #3182ce; }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid #4a5568;
+      border-top-color: #63b3ed;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .summary-card {
+      background: #16213e;
+      border-radius: 10px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .summary-card .count { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+    .summary-card .label { font-size: 11px; color: #a0aec0; }
+    .count-truncated { color: #f6ad55; }
+    .count-missing   { color: #fc8181; }
+    .count-orphan    { color: #68d391; }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 9px 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn-primary  { background: #3182ce; color: #fff; }
+    .btn-primary:not(:disabled):hover { opacity: 0.85; }
+    .btn-success  { background: #38a169; color: #fff; }
+    .btn-success:not(:disabled):hover { opacity: 0.85; }
+    .action-note { font-size: 11px; color: #a0aec0; }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+    .tab-btn {
+      padding: 7px 16px;
+      border: none;
+      border-radius: 6px 6px 0 0;
+      font-size: 12px;
+      cursor: pointer;
+      background: #16213e;
+      color: #a0aec0;
+      font-weight: 600;
+    }
+    .tab-btn.active { background: #0f3460; color: #a0d8ef; }
+
+    .result-table-wrap {
+      background: #16213e;
+      border-radius: 0 10px 10px 10px;
+      overflow: hidden;
+    }
+    .result-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .result-table th {
+      background: #0f3460;
+      color: #a0d8ef;
+      padding: 9px 12px;
+      text-align: left;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .result-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #1e2a4a;
+      vertical-align: top;
+    }
+    .result-table tr:last-child td { border-bottom: none; }
+    .result-table tr:hover td { background: #1e2a4a; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge-truncated { background: #744210; color: #f6ad55; }
+    .badge-missing   { background: #742a2a; color: #fc8181; }
+    .badge-orphan    { background: #1c4532; color: #68d391; }
+
+    .title-cell { max-width: 320px; word-break: break-all; }
+    .suggest-cell { max-width: 320px; word-break: break-all; color: #68d391; }
+    .levels-cell { font-family: monospace; white-space: nowrap; }
+    .hidden { display: none !important; }
+
+    .empty-state {
+      text-align: center;
+      padding: 32px;
+      color: #4a5568;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>補完データ メンテナンスツール</h1>
+    <p>レーダーCSVと補完スプレッドシートのタイトル不一致を検出・修正します</p>
+  </div>
+
+  <div class="container">
+
+    <div class="status-box loading" id="status-box">
+      <div class="spinner" id="spinner"></div>
+      <span id="status-text">データを読み込み中…</span>
+    </div>
+
+    <div id="main-content" class="hidden">
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="count count-truncated" id="cnt-truncated">0</div>
+          <div class="label">タイトル切れ（類似一致あり）</div>
+        </div>
+        <div class="summary-card">
+          <div class="count count-missing" id="cnt-missing">0</div>
+          <div class="label">補完未登録（完全不一致）</div>
+        </div>
+        <div class="summary-card">
+          <div class="count count-orphan" id="cnt-orphan">0</div>
+          <div class="label">レーダー未登録（孤立エントリ）</div>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn btn-primary" id="btn-reload" onclick="loadData()">再読み込み</button>
+        <button class="btn btn-success" id="btn-download" onclick="downloadCorrected()" disabled>
+          修正済み補完CSV をダウンロード
+        </button>
+        <span class="action-note">※ タイトル切れ分のエイリアス行を追加したCSVです。スプレッドシートへ再インポートしてください。</span>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" id="tab-btn-truncated" onclick="switchTab('truncated')">
+          タイトル切れ <span id="tab-cnt-truncated"></span>
+        </button>
+        <button class="tab-btn" id="tab-btn-missing" onclick="switchTab('missing')">
+          補完未登録 <span id="tab-cnt-missing"></span>
+        </button>
+        <button class="tab-btn" id="tab-btn-orphan" onclick="switchTab('orphan')">
+          孤立エントリ <span id="tab-cnt-orphan"></span>
+        </button>
+      </div>
+
+      <div class="result-table-wrap">
+        <!-- タイトル切れ -->
+        <div id="panel-truncated">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>レーダーCSVのタイトル（切れあり）</th>
+                <th>補完スプレッドシートの対応タイトル（推定）</th>
+                <th>難易度（SP B/N/H/A/L）</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-truncated"></tbody>
+          </table>
+          <div class="empty-state hidden" id="empty-truncated">タイトル切れの検出なし</div>
+        </div>
+
+        <!-- 補完未登録 -->
+        <div id="panel-missing" class="hidden">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>レーダーCSVのタイトル</th>
+                <th>備考</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-missing"></tbody>
+          </table>
+          <div class="empty-state hidden" id="empty-missing">未登録なし</div>
+        </div>
+
+        <!-- 孤立エントリ -->
+        <div id="panel-orphan" class="hidden">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>補完スプレッドシートのタイトル</th>
+                <th>難易度（SP B/N/H/A/L）</th>
+                <th>備考</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-orphan"></tbody>
+          </table>
+          <div class="empty-state hidden" id="empty-orphan">孤立エントリなし</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const RADAR_SHEET_ID   = '1If1uzZZY5zL0ZFXC394JsnggNX0fvkBmiGNpBSZvGOM';
+    const RADAR_NOTES_URL  = `https://docs.google.com/spreadsheets/d/${RADAR_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=NOTES`;
+    const SUPPLEMENT_URL   = 'https://docs.google.com/spreadsheets/d/1Bxkf59TJj17i5R_88j7e0ymhFUawQbpAjydeCjpsA4Q/gviz/tq?tqx=out:csv&gid=0';
+
+    const SUPPLEMENT_COLS = ['SP_B','SP_N','SP_H','SP_A','SP_L','DP_B','DP_N','DP_H','DP_A','DP_L'];
+
+    let currentTab = 'truncated';
+    let supplementRows = []; // 元のrowオブジェクト配列（CSV再生成用）
+    let supplementHeaders = [];
+    let truncatedPairs = []; // [{radarTitle, suppTitle, levels}]
+
+    // ── 文字列正規化 ──────────────────────────
+    function normalizeQuotes(s) {
+      return s
+        .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u301D\u301E\u301F\uFF02]/g, '"')
+        .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\uFF07\u02BC]/g, "'");
+    }
+    function titleKeyLoose(title) {
+      return normalizeQuotes(title.trim()).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
+        .replace(/[øœ]/g, 'o').replace(/ł/g, 'l').replace(/đ/g, 'd')
+        .replace(/ħ/g, 'h').replace(/ŧ/g, 't').replace(/ŋ/g, 'n')
+        .replace(/[^a-z0-9\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/gu, '');
+    }
+
+    // ── CSVパース ─────────────────────────────
+    function parseCSV(text) {
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const lines = text.trim().split(/\r?\n/);
+      const headers = splitLine(lines[0]);
+      const rows = lines.slice(1).map(l => {
+        const cells = splitLine(l);
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = (cells[i] ?? '').trim());
+        return obj;
+      });
+      return { headers, rows };
+    }
+    function splitLine(line) {
+      const result = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+          else if (inQ) { inQ = false; }
+          else if (cur === '') { inQ = true; }
+          else { cur += c; }
+        } else if (c === ',' && !inQ) {
+          result.push(cur); cur = '';
+        } else {
+          cur += c;
+        }
+      }
+      result.push(cur);
+      return result;
+    }
+
+    // ── ステータス表示 ────────────────────────
+    function setStatus(state, text) {
+      const box = document.getElementById('status-box');
+      box.className = 'status-box ' + state;
+      document.getElementById('spinner').style.display = state === 'loading' ? '' : 'none';
+      document.getElementById('status-text').textContent = text;
+    }
+
+    // ── タブ切替 ──────────────────────────────
+    function switchTab(tab) {
+      currentTab = tab;
+      ['truncated','missing','orphan'].forEach(t => {
+        document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+        document.getElementById(`tab-btn-${t}`).classList.toggle('active', t === tab);
+      });
+    }
+
+    // ── メイン処理 ────────────────────────────
+    async function loadData() {
+      document.getElementById('main-content').classList.add('hidden');
+      setStatus('loading', 'データを読み込み中…');
+
+      try {
+        const [radarText, suppText] = await Promise.all([
+          fetch(RADAR_NOTES_URL).then(r => { if (!r.ok) throw new Error(`レーダーCSV取得失敗 HTTP ${r.status}`); return r.text(); }),
+          fetch(SUPPLEMENT_URL).then(r => { if (!r.ok) throw new Error(`補完スプレッドシート取得失敗 HTTP ${r.status}`); return r.text(); }),
+        ]);
+
+        // レーダーCSV: SP曲タイトルを収集
+        const { rows: radarRows } = parseCSV(radarText);
+        const radarTitleSet = new Map(); // titleKeyLoose → rawTitle (重複排除・最初のもの採用)
+        for (const row of radarRows) {
+          if ((row['SP/DP'] || '').trim() !== 'SP') continue;
+          const rawTitle = (row['タイトル'] || '').trim();
+          if (!rawTitle) continue;
+          const lk = titleKeyLoose(rawTitle);
+          if (!radarTitleSet.has(lk)) radarTitleSet.set(lk, rawTitle);
+        }
+
+        // 補完CSV: titleKeyLoose → {rawTitle, row} マップ
+        const parsed = parseCSV(suppText);
+        supplementRows = parsed.rows;
+        supplementHeaders = parsed.headers;
+
+        // headersにTITLE列が含まれているか確認
+        const titleCol = supplementHeaders.includes('TITLE') ? 'TITLE' : supplementHeaders[0];
+
+        const suppMap = new Map(); // titleKeyLoose → {rawTitle, row}
+        for (const row of supplementRows) {
+          const rawTitle = (row[titleCol] || '').trim();
+          if (!rawTitle) continue;
+          suppMap.set(titleKeyLoose(rawTitle), { rawTitle, row });
+        }
+
+        // ── 比較 ──────────────────────────────
+
+        // タイトル切れ・補完未登録の検出
+        truncatedPairs = [];
+        const missingTitles = [];
+        const matchedSuppKeys = new Set();
+
+        for (const [radarLoose, radarRaw] of radarTitleSet) {
+          if (suppMap.has(radarLoose)) {
+            matchedSuppKeys.add(radarLoose);
+            continue;
+          }
+          // 類似検索: 補完側のkeyがradarLooseから始まるか（補完が長い＝radarが切れている）
+          // または radarLooseがsuppKeyから始まるか（補完が短い＝補完側が切れている）
+          let fuzzy = null;
+          let fuzzyType = null;
+          for (const [suppLoose, suppEntry] of suppMap) {
+            if (suppLoose.startsWith(radarLoose) && suppLoose.length > radarLoose.length) {
+              fuzzy = suppEntry;
+              fuzzyType = 'radar_truncated'; // レーダーCSVが切れている
+              break;
+            }
+            if (radarLoose.startsWith(suppLoose) && radarLoose.length > suppLoose.length) {
+              fuzzy = suppEntry;
+              fuzzyType = 'supp_truncated'; // 補完CSVが切れている
+              break;
+            }
+          }
+          if (fuzzy) {
+            matchedSuppKeys.add(titleKeyLoose(fuzzy.rawTitle));
+            truncatedPairs.push({
+              radarTitle: radarRaw,
+              suppTitle: fuzzy.rawTitle,
+              fuzzyType,
+              row: fuzzy.row,
+            });
+          } else {
+            missingTitles.push(radarRaw);
+          }
+        }
+
+        // 孤立エントリ: 補完にあってレーダーにない
+        const orphanEntries = [];
+        for (const [suppLoose, suppEntry] of suppMap) {
+          if (!matchedSuppKeys.has(suppLoose)) {
+            orphanEntries.push(suppEntry);
+          }
+        }
+
+        // ── 表示 ──────────────────────────────
+        renderTruncated(truncatedPairs, titleCol);
+        renderMissing(missingTitles);
+        renderOrphan(orphanEntries, titleCol);
+
+        document.getElementById('cnt-truncated').textContent = truncatedPairs.length;
+        document.getElementById('cnt-missing').textContent   = missingTitles.length;
+        document.getElementById('cnt-orphan').textContent    = orphanEntries.length;
+        document.getElementById('tab-cnt-truncated').textContent = truncatedPairs.length > 0 ? `(${truncatedPairs.length})` : '';
+        document.getElementById('tab-cnt-missing').textContent   = missingTitles.length   > 0 ? `(${missingTitles.length})`   : '';
+        document.getElementById('tab-cnt-orphan').textContent    = orphanEntries.length   > 0 ? `(${orphanEntries.length})`   : '';
+
+        document.getElementById('btn-download').disabled = truncatedPairs.length === 0;
+        document.getElementById('main-content').classList.remove('hidden');
+        switchTab('truncated');
+
+        const total = truncatedPairs.length + missingTitles.length;
+        setStatus(total === 0 ? 'ok' : 'ok',
+          total === 0
+            ? `✔ チェック完了 — 不一致なし (レーダー ${radarTitleSet.size}曲 / 補完 ${suppMap.size}曲)`
+            : `⚠ チェック完了 — ${truncatedPairs.length}件のタイトル切れ・${missingTitles.length}件の未登録を検出 (レーダー ${radarTitleSet.size}曲 / 補完 ${suppMap.size}曲)`
+        );
+
+      } catch (e) {
+        setStatus('error', '✖ ' + e.message);
+      }
+    }
+
+    function formatLevels(row) {
+      return ['SP_B','SP_N','SP_H','SP_A','SP_L'].map(c => {
+        const v = row[c] || '-';
+        return v === '-' || v === '' ? '-' : v;
+      }).join(' / ');
+    }
+
+    function renderTruncated(pairs, titleCol) {
+      const tbody = document.getElementById('tbody-truncated');
+      const empty = document.getElementById('empty-truncated');
+      tbody.innerHTML = '';
+      if (pairs.length === 0) {
+        tbody.closest('table').classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+      tbody.closest('table').classList.remove('hidden');
+      empty.classList.add('hidden');
+      for (const p of pairs) {
+        const typeLabel = p.fuzzyType === 'radar_truncated'
+          ? '<span class="badge badge-truncated">レーダー側が切れ</span>'
+          : '<span class="badge badge-truncated">補完側が切れ</span>';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="title-cell">${esc(p.radarTitle)}<br>${typeLabel}</td>
+          <td class="suggest-cell">${esc(p.suppTitle)}</td>
+          <td class="levels-cell">${esc(formatLevels(p.row))}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function renderMissing(titles) {
+      const tbody = document.getElementById('tbody-missing');
+      const empty = document.getElementById('empty-missing');
+      tbody.innerHTML = '';
+      if (titles.length === 0) {
+        tbody.closest('table').classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+      tbody.closest('table').classList.remove('hidden');
+      empty.classList.add('hidden');
+      for (const t of titles) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="title-cell">${esc(t)}</td>
+          <td style="color:#a0aec0;font-size:11px;">補完スプレッドシートへ手動追加してください</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function renderOrphan(entries, titleCol) {
+      const tbody = document.getElementById('tbody-orphan');
+      const empty = document.getElementById('empty-orphan');
+      tbody.innerHTML = '';
+      if (entries.length === 0) {
+        tbody.closest('table').classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+      tbody.closest('table').classList.remove('hidden');
+      empty.classList.add('hidden');
+      for (const e of entries) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="title-cell">${esc(e.rawTitle)}</td>
+          <td class="levels-cell">${esc(formatLevels(e.row))}</td>
+          <td style="color:#a0aec0;font-size:11px;">レーダーCSVに対応曲なし（削除済み・別表記の可能性）</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // ── 修正済み補完CSV生成 ────────────────────
+    function downloadCorrected() {
+      if (supplementHeaders.length === 0) return;
+
+      // 元のrowsをそのままCSVに変換し、タイトル切れ分のエイリアス行を末尾に追加
+      const lines = [];
+
+      // ヘッダー行
+      lines.push(supplementHeaders.map(csvEscape).join(','));
+
+      // 既存データ行
+      for (const row of supplementRows) {
+        lines.push(supplementHeaders.map(h => csvEscape(row[h] ?? '')).join(','));
+      }
+
+      // タイトル切れエイリアス行（レーダーCSVのタイトルで補完データを再登録）
+      for (const p of truncatedPairs) {
+        if (p.fuzzyType !== 'radar_truncated') continue; // レーダー側が切れているケースのみ
+        const titleCol = supplementHeaders.includes('TITLE') ? 'TITLE' : supplementHeaders[0];
+        const aliasRow = { ...p.row, [titleCol]: p.radarTitle };
+        lines.push(supplementHeaders.map(h => csvEscape(aliasRow[h] ?? '')).join(','));
+      }
+
+      const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = 'iidx_supplement_corrected.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function csvEscape(val) {
+      const s = String(val);
+      if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // 起動時に自動実行
+    loadData();
+  </script>
+</body>
+</html>
