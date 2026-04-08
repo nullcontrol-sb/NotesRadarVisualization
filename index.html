@@ -226,8 +226,20 @@
     }
     .view-tab-btn:hover { background: #1e2a4a; color: #e2e8f0; }
     .view-tab-btn.active { background: #e94560; color: #fff; border-color: #e94560; }
-    .hide-alts-label {
+    .options-wrapper {
       margin-left: auto;
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .options-toggle-btn { display: none; }
+    .options-panel {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hide-alts-label {
       display: flex;
       align-items: center;
       gap: 5px;
@@ -239,7 +251,6 @@
     }
     .hide-alts-label input[type="checkbox"] { cursor: pointer; accent-color: #e94560; }
     .clear-selection-btn {
-      margin-left: 0;
       padding: 7px 14px;
       background: transparent;
       border: 1px solid #4a5568;
@@ -248,6 +259,7 @@
       font-size: 12px;
       cursor: pointer;
       transition: background 0.15s, color 0.15s, border-color 0.15s;
+      white-space: nowrap;
     }
     .clear-selection-btn:hover { background: #1e2a4a; color: #e2e8f0; border-color: #a0aec0; }
 
@@ -477,6 +489,33 @@
     }
 
     @media (max-width: 940px) {
+      .options-toggle-btn {
+        display: block;
+        padding: 7px 12px;
+        background: #16213e;
+        border: 1px solid #0f3460;
+        border-radius: 6px;
+        color: #a0aec0;
+        font-size: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .options-panel {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        background: #16213e;
+        border: 1px solid #0f3460;
+        border-radius: 8px;
+        padding: 12px 14px;
+        z-index: 200;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      }
+      .options-panel.open { display: flex; }
       table { font-size: 12px; }
       thead th { padding: 8px 6px; }
       tbody td { padding: 8px 6px; white-space: normal; }
@@ -554,8 +593,13 @@
     <div class="view-tab-bar">
       <button class="view-tab-btn active" id="view-tab-played"   onclick="switchView('played')">プレイ済み上位</button>
       <button class="view-tab-btn"        id="view-tab-unplayed" onclick="switchView('unplayed')">未プレイ上位</button>
-      <label class="hide-alts-label"><input type="checkbox" id="hide-alts-cb">ランクイン楽曲の別難易度を表示しない</label>
-      <button class="clear-selection-btn" id="clear-selection-btn">選択全解除</button>
+      <div class="options-wrapper">
+        <button class="options-toggle-btn" id="options-toggle-btn">オプション ▾</button>
+        <div class="options-panel" id="options-panel">
+          <label class="hide-alts-label"><input type="checkbox" id="hide-alts-cb">ランクイン楽曲の別難易度を表示しない</label>
+          <button class="clear-selection-btn" id="clear-selection-btn">選択全解除</button>
+        </div>
+      </div>
     </div>
     <div class="tab-bar" id="tab-bar"></div>
     <div class="info-bar">
@@ -1271,6 +1315,19 @@
         tr.classList.toggle('selected', selectedRows.has(tr.dataset.rowKey));
       });
     }
+
+    // ── オプションドロップダウン（モバイル用）──────
+    const optionsToggleBtn = document.getElementById('options-toggle-btn');
+    const optionsPanel     = document.getElementById('options-panel');
+    optionsToggleBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      optionsPanel.classList.toggle('open');
+    });
+    document.addEventListener('click', e => {
+      if (!optionsPanel.contains(e.target) && e.target !== optionsToggleBtn) {
+        optionsPanel.classList.remove('open');
+      }
+    });
 
     // ── 別難易度非表示チェックボックス ──────────
     const HIDE_ALTS_KEY = 'nrv_hide_alts';
