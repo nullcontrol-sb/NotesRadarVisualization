@@ -326,6 +326,18 @@
       white-space: nowrap;
     }
     thead th.left { text-align: left; }
+    .level-filter-select {
+      background: #1a2744;
+      color: #a0d8ef;
+      border: 1px solid #3a5a8a;
+      border-radius: 5px;
+      padding: 3px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+    .level-filter-select:hover { border-color: #63b3ed; }
 
     tbody tr {
       border-bottom: 1px solid #0f3460;
@@ -730,8 +742,9 @@
     let resultsByType       = {};
     let unplayedByType      = {};
     let scoreRows           = null;
-    let activeTab       = 'NOTES';
-    let viewMode        = 'played'; // 'played' | 'unplayed'
+    let activeTab            = 'NOTES';
+    let viewMode             = 'played'; // 'played' | 'unplayed'
+    let unplayedLevelFilter  = '';       // 未プレイ ☆フィルタ値（''=すべて）
 
     // ── タブ生成 ─────────────────────────────
     const tabBar = document.getElementById('tab-bar');
@@ -1284,12 +1297,6 @@
       const unplayed = unplayedByType[activeTab];
       if (!unplayed) return;
 
-      document.getElementById('thead').innerHTML = `<tr>
-        <th style="width:40px">#</th>
-        <th class="left">タイトル</th>
-        <th>難易度</th><th>☆</th>
-        <th>MAXレーダー値</th>
-      </tr>`;
       document.getElementById('avg-value').style.display = 'none';
 
       const top10played = resultsByType[activeTab] || [];
@@ -1308,7 +1315,34 @@
       const filteredUnplayed = hideAlts
         ? unplayed.filter(r => !top10PlayedKeys.has(titleKeyLoose(r.title)))
         : unplayed;
-      const top10 = filteredUnplayed.slice(0, 20);
+
+      // ☆フィルタ用: filteredUnplayed に含まれる数値レベルを降順収集
+      const availableLevels = [...new Set(
+        filteredUnplayed.map(r => r.level).filter(l => l && l !== '0')
+      )].sort((a, b) => parseInt(b) - parseInt(a));
+      const levelOptions = [
+        `<option value="">すべて</option>`,
+        ...availableLevels.map(l =>
+          `<option value="${l}"${unplayedLevelFilter === l ? ' selected' : ''}>☆${l}</option>`
+        ),
+      ].join('');
+
+      document.getElementById('thead').innerHTML = `<tr>
+        <th style="width:40px">#</th>
+        <th class="left">タイトル</th>
+        <th>難易度</th>
+        <th><select id="unplayed-level-filter" class="level-filter-select">${levelOptions}</select></th>
+        <th>MAXレーダー値</th>
+      </tr>`;
+      document.getElementById('unplayed-level-filter').addEventListener('change', e => {
+        unplayedLevelFilter = e.target.value;
+        renderUnplayedTab();
+      });
+
+      const levelFiltered = unplayedLevelFilter
+        ? filteredUnplayed.filter(r => r.level === unplayedLevelFilter)
+        : filteredUnplayed;
+      const top10 = levelFiltered.slice(0, 20);
 
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = top10.map((r, i) => {
