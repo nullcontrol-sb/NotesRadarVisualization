@@ -1053,10 +1053,11 @@
           if (UNPLAYED_EXCLUDE.has(radar.rawTitle)) continue;
           const aliasTitle = RADAR_TITLE_ALIAS.get(radar.rawTitle);
           const aliasKey   = aliasTitle ? `${titleKeyLoose(aliasTitle)}::${diffAbbr}` : null;
-          const level = levelMap.get(looseKey)
+          const rawLevel = levelMap.get(looseKey);
+          const level = (rawLevel && rawLevel !== '0' ? rawLevel : null)
                      || supplementLevelMap.get(looseKey)
                      || (aliasKey ? supplementLevelMap.get(aliasKey) : '')
-                     || '';
+                     || rawLevel || '';
           const maxEx = radar.notes * 2;
           const displayRawTitle = RADAR_TITLE_ALIAS.get(radar.rawTitle) || radar.rawTitle;
           unplayed.push({ title: displayRawTitle, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
