@@ -268,6 +268,15 @@
     let supplementHeaders = [];
     let truncatedPairs = []; // [{radarTitle, suppTitle, levels}]
 
+    // レーダーCSVタイトル → 補完CSVの正式タイトル（index.htmlと同期を保つこと）
+    const RADAR_TITLE_ALIAS = new Map([
+      ['灼熱Beach Side Bunny (Masayoshi Iimori Remi', '灼熱Beach Side Bunny (Masayoshi Iimori Remix)'],
+      ['.59', '0.59'],
+      ['BALLAD THE FEÆTHERS', 'BALLAD THE FEATHERS'],
+      ['ACT0', 'ACTØ'],
+      ['POLKAMANIA', 'POLꓘAMAИIA'],
+    ]);
+
     // ── 文字列正規化 ──────────────────────────
     function normalizeQuotes(s) {
       return s
@@ -406,7 +415,14 @@
               row:        fuzzy.row,
             });
           } else {
-            missingTitles.push(radarRaw);
+            // RADAR_TITLE_ALIASによる照合（index.htmlで対応済みの既知表記差異）
+            const aliasTitle = RADAR_TITLE_ALIAS.get(radarRaw);
+            const aliasLoose = aliasTitle ? titleKeyLoose(aliasTitle) : null;
+            if (aliasLoose && suppMap.has(aliasLoose)) {
+              matchedSuppKeys.add(aliasLoose);
+            } else {
+              missingTitles.push(radarRaw);
+            }
           }
         }
 
