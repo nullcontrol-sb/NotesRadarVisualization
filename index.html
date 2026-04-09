@@ -326,6 +326,18 @@
       white-space: nowrap;
     }
     thead th.left { text-align: left; }
+    .level-filter-select {
+      background: #1a2744;
+      color: #a0d8ef;
+      border: 1px solid #3a5a8a;
+      border-radius: 5px;
+      padding: 3px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+    .level-filter-select:hover { border-color: #63b3ed; }
 
     tbody tr {
       border-bottom: 1px solid #0f3460;
@@ -625,6 +637,10 @@
         <h3>■リリースノート</h3>
       </div>
       <div class="modal-section">
+        <h3>〇2026/04/09</h3>
+        <p>・未プレイ一覧に楽曲Levelでのフィルタを追加<br>└各楽曲Level毎にMAXレーダー値が高い順に20曲を表示できるようになりました。<br><br>・楽曲Level取得ロジックの変更<br>└今まではスコアCSVに載っていない一度もプレイされていない曲は「楽曲未プレイ」として出力していましたが、別途楽曲Levelを網羅したソースを用意して参照することで、全譜面のLevelが表示されるようになりました。<br><br>・削除曲判定ロジックの変更<br>└ノーツレーダー値一覧に残っている削除曲について、ソースに応じて動的に表示させないようにしました。<br><br>・同一楽曲判定ロジックの修正<br>└一部楽曲が正しく判定できていなかった為修正しました。</p>
+      </div>
+      <div class="modal-section">
         <h3>〇2026/04/08</h3>
         <p>・同一タイトル別難易度の考慮が漏れていた為修正。<br>└TOP10内に同一タイトル曲が複数入る場合、低い方を弾き出すようにしました。<br>　また、TOP10入りのスコア差分を同一タイトル曲と比較して算出するようにしました。<br><br>・「ランクイン楽曲の別難易度を表示しない」チェックボックスを追加しました。<br>└ONにすると、TOP10入りしている曲の同一タイトル曲を候補として表示しないようにします。<br><br>・オプション周りを調整しました。<br>└「選択全解除」ボタンの名称を「ハイライト選択全解除」に変更しました。<br>└スマホ表示の場合、「ランクイン楽曲の別難易度を表示しない」チェックボックスと「ハイライト選択全解除」ボタンを「オプション」ドロップボックス内に集約するようにしました。<br><br>・リリースノートを追加しました。</p>
       </div>
@@ -683,6 +699,8 @@
     const BASE_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
     const RADAR_TYPES = ['NOTES', 'CHORD', 'PEAK', 'CHARGE', 'SCRATCH', 'SOF-LAN'];
 
+    const LEVEL_SUPPLEMENT_URL = 'https://docs.google.com/spreadsheets/d/1Bxkf59TJj17i5R_88j7e0ymhFUawQbpAjydeCjpsA4Q/gviz/tq?tqx=out:csv&gid=0';
+
     // タイトル照合例外: スコアCSVのタイトル → レーダーCSVで追加で試すタイトル候補
     // 通常の strict/loose マッチングで一致しない場合のフォールバック
     const TITLE_LOOKUP_EXTRA = new Map([
@@ -693,18 +711,19 @@
     // 表示名上書き: スコアCSVのタイトル → 正式な表示名
     const TITLE_DISPLAY_OVERRIDE = new Map([
       ['0.59', '.59'],
+      ['VOID', 'VØID'],
     ]);
     function displayTitle(rawTitle) {
       return TITLE_DISPLAY_OVERRIDE.get(rawTitle) ?? rawTitle;
     }
 
-    // 未プレイ一覧から除外するタイトル（rawTitle の完全一致）
-    const UNPLAYED_EXCLUDE = new Set([
-      'デモーニッシュ',
-      '俺ら東京さ行ぐだ',
-      'Sweet Clapper',
-      'Please Welcome Mr.C',
-      'anthracene',
+    // レーダーCSVのタイトル切れ・表記差異 → 補完スプレッドシートの正式タイトル へのエイリアス
+    const RADAR_TITLE_ALIAS = new Map([
+      ['灼熱Beach Side Bunny (Masayoshi Iimori Remi', '灼熱Beach Side Bunny (Masayoshi Iimori Remix)'],
+      ['.59', '0.59'],                       // レーダーCSVは".59"、補完CSVは"0.59"
+      ['BALLAD THE FEÆTHERS', 'BALLAD THE FEATHERS'], // レーダーCSVはÆ表記、補完CSVはAEなし
+      ['ACT0', 'ACTØ'],                      // レーダーCSVは digit "0"、補完CSVは "Ø"
+      ['POLKAMANIA', 'POLꓘAMAИIA'],          // レーダーCSVはASCII、補完CSVはLisu/キリル文字混じり
     ]);
 
     const DIFF_MAP = [
@@ -716,12 +735,15 @@
     ];
 
     // radarMapByType: { NOTES: Map, CHORD: Map, ... }
-    let radarMapByType  = {};
-    let resultsByType   = {};
-    let unplayedByType  = {};
-    let scoreRows       = null;
-    let activeTab       = 'NOTES';
-    let viewMode        = 'played'; // 'played' | 'unplayed'
+    let radarMapByType      = {};
+    let supplementLevelMap  = new Map(); // titleKeyForDedup::diffAbbr → level (補完CSV由来)
+    let supplementTitleSet  = new Set(); // 補完CSVに存在するtitleKeyForDedup集合
+    let resultsByType       = {};
+    let unplayedByType      = {};
+    let scoreRows           = null;
+    let activeTab            = 'NOTES';
+    let viewMode             = 'played'; // 'played' | 'unplayed'
+    let unplayedLevelFilter  = '';       // 未プレイ ☆フィルタ値（''=すべて）
 
     // ── タブ生成 ─────────────────────────────
     const tabBar = document.getElementById('tab-bar');
@@ -751,18 +773,32 @@
       tx.textContent = text;
     }
 
+    // 補完レベルCSVの列名と DIFF_MAP の abbr の対応
+    const SUPPLEMENT_COL_MAP = [
+      { col: 'SP_B', abbr: 'B' },
+      { col: 'SP_N', abbr: 'N' },
+      { col: 'SP_H', abbr: 'H' },
+      { col: 'SP_A', abbr: 'A' },
+      { col: 'SP_L', abbr: 'L' },
+    ];
+
     async function fetchRadarData() {
       setRadarStatus('loading', 'ノーツレーダーデータを読み込み中…');
       try {
-        const results = await Promise.all(
-          RADAR_TYPES.map(type =>
-            fetch(BASE_URL + encodeURIComponent(type))
-              .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
-              .then(text => ({ type, text }))
-          )
-        );
+        const [radarResults, supplementText] = await Promise.all([
+          Promise.all(
+            RADAR_TYPES.map(type =>
+              fetch(BASE_URL + encodeURIComponent(type))
+                .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+                .then(text => ({ type, text }))
+            )
+          ),
+          fetch(LEVEL_SUPPLEMENT_URL)
+            .then(r => r.ok ? r.text() : Promise.resolve(''))
+            .catch(() => ''),
+        ]);
 
-        for (const { type, text } of results) {
+        for (const { type, text } of radarResults) {
           const { rows } = parseCSV(text);
           const strictMap = new Map();
           const looseMap  = new Map();
@@ -775,12 +811,28 @@
             if (!rawTitle || !diff || isNaN(notes) || isNaN(max)) continue;
             const entry = { notes, max, rawTitle };
             strictMap.set(`${titleKeyStrict(rawTitle)}::${diff}`, entry);
-            looseMap.set(`${titleKeyLoose(rawTitle)}::${diff}`, entry);
+            looseMap.set(`${titleKeyForDedup(rawTitle)}::${diff}`, entry);
           }
           radarMapByType[type] = { strict: strictMap, loose: looseMap };
         }
 
-        const total = Object.values(radarMapByType).reduce((s, m) => s + m.strict.size, 0);
+        // 補完レベルマップ・タイトル集合を構築
+        if (supplementText) {
+          const { rows: supRows } = parseCSV(supplementText);
+          supplementLevelMap = new Map();
+          supplementTitleSet = new Set();
+          for (const row of supRows) {
+            const rawTitle = (row['TITLE'] || '').trim();
+            if (!rawTitle) continue;
+            const tk = titleKeyForDedup(rawTitle);
+            supplementTitleSet.add(tk);
+            for (const { col, abbr } of SUPPLEMENT_COL_MAP) {
+              const level = (row[col] || '').trim();
+              if (level && level !== '-') supplementLevelMap.set(`${tk}::${abbr}`, level);
+            }
+          }
+        }
+
         setRadarStatus('ok', `✔ ノーツレーダーデータ読み込み完了`);
         tryCalculate();
       } catch (e) {
@@ -891,11 +943,18 @@
     // NFKDで分解されないストローク付きラテン文字はASCII相当に変換してから除去
     function titleKeyLoose(title) {
       return normalizeQuotes(title.trim()).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
-        .replace(/[øœ]/g, 'o').replace(/ł/g, 'l').replace(/đ/g, 'd')
+        .replace(/[øœ]/g, 'o').replace(/æ/g, 'ae').replace(/ə/g, 'e')
+        .replace(/ł/g, 'l').replace(/đ/g, 'd')
         .replace(/ħ/g, 'h').replace(/ŧ/g, 't').replace(/ŋ/g, 'n')
+        .replace(/[\u3041-\u3096]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60)) // ひらがな→カタカナ
         .replace(/[^a-z0-9\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/gu, '');
     }
     function titleKey(title) { return titleKeyStrict(title); }
+    // 重複排除用: looseキーが空（記号のみタイトル：〆/∀/≡+≡等）の場合はstrictキーにフォールバック
+    function titleKeyForDedup(title) {
+      const loose = titleKeyLoose(title);
+      return loose || titleKeyStrict(title);
+    }
 
     // ── CSV パース ───────────────────────────
     function parseCSV(text) {
@@ -939,14 +998,14 @@
       resultsByType  = {};
       unplayedByType = {};
 
-      // レベルマップをスコアCSVから構築 (titleKeyLoose::diffAbbr → level)
+      // レベルマップをスコアCSVから構築 (titleKeyForDedup::diffAbbr → level)
       const levelMap = new Map();
       // スコアCSVのプレイ済みlooseセット（radar未マッチでも判定に使う）
       const scoreLoosePlayedSet = new Set();
       for (const row of scoreRows) {
         const rawTitle = (row['タイトル'] || '').trim();
         if (!rawTitle) continue;
-        const tk = titleKeyLoose(rawTitle);
+        const tk = titleKeyForDedup(rawTitle);
         for (const diff of DIFF_MAP) {
           const level     = row[`${diff.full} 難易度`] || '';
           const clearType = (row[`${diff.full} クリアタイプ`] || '').trim();
@@ -971,15 +1030,15 @@
             if (clearType === 'NO PLAY' || clearType === '') continue;
             const score = parseInt(row[`${diff.full} スコア`]);
             if (isNaN(score) || score <= 0) continue;
-            const level = row[`${diff.full} 難易度`] || '';
+            const level = row[`${diff.full} 難易度`] || supplementLevelMap.get(`${titleKeyForDedup(rawTitle)}::${diff.abbr}`) || '';
             const radar = maps.strict.get(`${titleKeyStrict(rawTitle)}::${diff.abbr}`)
-                       || maps.loose.get(`${titleKeyLoose(rawTitle)}::${diff.abbr}`)
+                       || maps.loose.get(`${titleKeyForDedup(rawTitle)}::${diff.abbr}`)
                        || (() => {
                          const extras = TITLE_LOOKUP_EXTRA.get(rawTitle);
                          if (!extras) return undefined;
                          for (const alt of extras) {
                            const r = maps.strict.get(`${titleKeyStrict(alt)}::${diff.abbr}`)
-                                  || maps.loose.get(`${titleKeyLoose(alt)}::${diff.abbr}`);
+                                  || maps.loose.get(`${titleKeyForDedup(alt)}::${diff.abbr}`);
                            if (r) return r;
                          }
                        })();
@@ -1008,15 +1067,25 @@
         for (const [strictKey, radar] of maps.strict) {
           const sepIdx   = strictKey.lastIndexOf('::');
           const diffAbbr = strictKey.slice(sepIdx + 2);
-          const looseKey = `${titleKeyLoose(radar.rawTitle)}::${diffAbbr}`;
+          const looseKey = `${titleKeyForDedup(radar.rawTitle)}::${diffAbbr}`;
           // strict または loose で一致すれば played とみなす
           if (strictPlayedSet.has(strictKey) || scoreLoosePlayedSet.has(looseKey)) continue;
           const diffEntry = DIFF_MAP.find(d => d.abbr === diffAbbr);
           if (!diffEntry) continue;
-          if (UNPLAYED_EXCLUDE.has(radar.rawTitle)) continue;
-          const level = levelMap.get(looseKey) || '';
+          const aliasTitle = RADAR_TITLE_ALIAS.get(radar.rawTitle);
+          const aliasKey   = aliasTitle ? `${titleKeyForDedup(aliasTitle)}::${diffAbbr}` : null;
+          // 補完スプレッドシート（IIDX Difficulty）に存在しない曲は除外
+          const inSupplement = supplementTitleSet.has(titleKeyForDedup(radar.rawTitle))
+                            || (aliasTitle && supplementTitleSet.has(titleKeyForDedup(aliasTitle)));
+          if (!inSupplement) continue;
+          const rawLevel = levelMap.get(looseKey);
+          const level = (rawLevel && rawLevel !== '0' ? rawLevel : null)
+                     || supplementLevelMap.get(looseKey)
+                     || (aliasKey ? supplementLevelMap.get(aliasKey) : '')
+                     || rawLevel || '';
           const maxEx = radar.notes * 2;
-          unplayed.push({ title: radar.rawTitle, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
+          const displayRawTitle = RADAR_TITLE_ALIAS.get(radar.rawTitle) || radar.rawTitle;
+          unplayed.push({ title: displayRawTitle, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
         }
 
         unplayed.sort((a, b) => b.radarMax - a.radarMax);
@@ -1115,10 +1184,10 @@
       </tr>`;
       document.getElementById('avg-value').style.display = '';
 
-      // タイトル重複排除: タイトルごとに最高radarValueの難易度を代表とする
-      const repMap = new Map(); // title → 代表エントリ
+      // タイトル重複排除: titleKeyForDedupで正規化したキーで同一曲判定
+      const repMap = new Map(); // titleKeyForDedup → 代表エントリ
       for (const r of results) {
-        if (!repMap.has(r.title)) repMap.set(r.title, r);
+        if (!repMap.has(titleKeyForDedup(r.title))) repMap.set(titleKeyForDedup(r.title), r);
       }
       // 代表リスト (resultsがradarValue降順なので挿入順 = 降順)
       const repList = [...repMap.values()];
@@ -1128,17 +1197,17 @@
 
       // TOP10 (代表)
       const repTop10 = repList.slice(0, 10);
-      const repTop10Keys = new Set(repTop10.map(r => r.title + '::' + r.diffAbbr));
+      const repTop10Keys = new Set(repTop10.map(r => titleKeyForDedup(r.title) + '::' + r.diffAbbr));
 
       // 弾き出し: 生の上位10件の中にいた非代表エントリのみ
       // (代表の方が必ず高いradarValueなので、代表も必ずTOP10内に存在する)
-      const displaced = results.slice(0, 10).filter(r => repMap.get(r.title) !== r);
-      const displacedKeys = new Set(displaced.map(r => r.title + '::' + r.diffAbbr));
+      const displaced = results.slice(0, 10).filter(r => repMap.get(titleKeyForDedup(r.title)) !== r);
+      const displacedKeys = new Set(displaced.map(r => titleKeyForDedup(r.title) + '::' + r.diffAbbr));
 
       // 11位以降: repTop10・displaced を除いた残り上位10件
       // 代表・非代表どちらも含む（非代表はガイダンスを同タイトル代表との比較に変更）
       const bottomEntries = results.filter(r => {
-        const key = r.title + '::' + r.diffAbbr;
+        const key = titleKeyForDedup(r.title) + '::' + r.diffAbbr;
         return !repTop10Keys.has(key) && !displacedKeys.has(key);
       }).slice(0, 10);
 
@@ -1182,7 +1251,7 @@
       repTop10.forEach((r, i) => rows.push(makeRow(r, i + 1, '')));
       // 弾き出されたエントリ (同タイトル代表との差分ガイダンス付き)
       if (!hideAlts) displaced.forEach(r => {
-        const rep = repMap.get(r.title);
+        const rep = repMap.get(titleKeyForDedup(r.title));
         const guidanceHtml = makeGuidanceHtml(r, rep ? rep.radarValue : null, true);
         const { nearestName, diff: djDiff } = getDJLevelInfo(r.score, r.maxEx);
         const sign = (djDiff >= 0 && nearestName !== 'MAX-') ? '+' : '';
@@ -1203,9 +1272,9 @@
       const bottomList = hideAlts ? repRest : bottomEntries;
       bottomList.forEach((r, i) => {
         const rank = i + 11;
-        const isRep = repMap.get(r.title) === r;
+        const isRep = repMap.get(titleKeyForDedup(r.title)) === r;
         // 非代表の場合は同タイトル代表との比較、代表はTOP10閾値との比較
-        const guidanceThreshold = isRep ? top10threshold : (repMap.get(r.title)?.radarValue ?? null);
+        const guidanceThreshold = isRep ? top10threshold : (repMap.get(titleKeyForDedup(r.title))?.radarValue ?? null);
         const guidanceHtml = makeGuidanceHtml(r, guidanceThreshold, !isRep);
         const { nearestName, diff: djDiff } = getDJLevelInfo(r.score, r.maxEx);
         const sign = (djDiff >= 0 && nearestName !== 'MAX-') ? '+' : '';
@@ -1239,31 +1308,52 @@
       const unplayed = unplayedByType[activeTab];
       if (!unplayed) return;
 
-      document.getElementById('thead').innerHTML = `<tr>
-        <th style="width:40px">#</th>
-        <th class="left">タイトル</th>
-        <th>難易度</th><th>☆</th>
-        <th>MAXレーダー値</th>
-      </tr>`;
       document.getElementById('avg-value').style.display = 'none';
 
       const top10played = resultsByType[activeTab] || [];
       // 重複排除後のTOP10閾値で判定
-      // CSVごとに引用符等の表記が異なる場合に備えtitleKeyLooseで正規化したキーを使用
-      const repMapPlayed = new Map(); // looseKey → entry
+      // CSVごとに引用符等の表記が異なる場合に備えtitleKeyForDedupで正規化したキーを使用
+      const repMapPlayed = new Map(); // titleKeyForDedup → entry
       for (const r of top10played) {
-        const key = titleKeyLoose(r.title);
+        const key = titleKeyForDedup(r.title);
         if (!repMapPlayed.has(key)) repMapPlayed.set(key, r);
       }
       const repListPlayed = [...repMapPlayed.values()];
       const top10threshold = repListPlayed.length >= 10 ? repListPlayed[9].radarValue : null;
-      // TOP10内のタイトル集合（looseKeyで保持）
-      const top10PlayedKeys = new Set(repListPlayed.slice(0, 10).map(r => titleKeyLoose(r.title)));
+      // TOP10内のタイトル集合（titleKeyForDedupで保持）
+      const top10PlayedKeys = new Set(repListPlayed.slice(0, 10).map(r => titleKeyForDedup(r.title)));
       const hideAlts = document.getElementById('hide-alts-cb').checked;
       const filteredUnplayed = hideAlts
-        ? unplayed.filter(r => !top10PlayedKeys.has(titleKeyLoose(r.title)))
+        ? unplayed.filter(r => !top10PlayedKeys.has(titleKeyForDedup(r.title)))
         : unplayed;
-      const top10 = filteredUnplayed.slice(0, 20);
+
+      // ☆フィルタ用: filteredUnplayed に含まれる数値レベルを降順収集
+      const availableLevels = [...new Set(
+        filteredUnplayed.map(r => r.level).filter(l => l && l !== '0')
+      )].sort((a, b) => parseInt(b) - parseInt(a));
+      const levelOptions = [
+        `<option value="">すべて</option>`,
+        ...availableLevels.map(l =>
+          `<option value="${l}"${unplayedLevelFilter === l ? ' selected' : ''}>☆${l}</option>`
+        ),
+      ].join('');
+
+      document.getElementById('thead').innerHTML = `<tr>
+        <th style="width:40px">#</th>
+        <th class="left">タイトル</th>
+        <th>難易度</th>
+        <th><select id="unplayed-level-filter" class="level-filter-select">${levelOptions}</select></th>
+        <th>MAXレーダー値</th>
+      </tr>`;
+      document.getElementById('unplayed-level-filter').addEventListener('change', e => {
+        unplayedLevelFilter = e.target.value;
+        renderUnplayedTab();
+      });
+
+      const levelFiltered = unplayedLevelFilter
+        ? filteredUnplayed.filter(r => r.level === unplayedLevelFilter)
+        : filteredUnplayed;
+      const top10 = levelFiltered.slice(0, 20);
 
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = top10.map((r, i) => {
@@ -1272,8 +1362,8 @@
         const medal     = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
 
         // 同タイトルがTOP10入りしている場合はその曲との比較を優先
-        const sameTitlePlayed = repMapPlayed.get(titleKeyLoose(r.title));
-        const isSameTitleInTop10 = sameTitlePlayed && top10PlayedKeys.has(titleKeyLoose(r.title));
+        const sameTitlePlayed = repMapPlayed.get(titleKeyForDedup(r.title));
+        const isSameTitleInTop10 = sameTitlePlayed && top10PlayedKeys.has(titleKeyForDedup(r.title));
         const threshold = isSameTitleInTop10 ? sameTitlePlayed.radarValue : top10threshold;
 
         let guidanceHtml = '';
