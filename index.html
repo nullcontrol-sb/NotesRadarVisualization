@@ -719,15 +719,6 @@
       ['灼熱Beach Side Bunny (Masayoshi Iimori Remi', '灼熱Beach Side Bunny (Masayoshi Iimori Remix)'],
     ]);
 
-    // 未プレイ一覧から除外するタイトル（rawTitle の完全一致）
-    const UNPLAYED_EXCLUDE = new Set([
-      'デモーニッシュ',
-      '俺ら東京さ行ぐだ',
-      'Sweet Clapper',
-      'Please Welcome Mr.C',
-      'anthracene',
-    ]);
-
     const DIFF_MAP = [
       { full: 'BEGINNER',    abbr: 'B' },
       { full: 'NORMAL',      abbr: 'N' },
@@ -739,6 +730,7 @@
     // radarMapByType: { NOTES: Map, CHORD: Map, ... }
     let radarMapByType      = {};
     let supplementLevelMap  = new Map(); // titleKeyLoose::diffAbbr → level (補完CSV由来)
+    let supplementTitleSet  = new Set(); // 補完CSVに存在するtitleKeyLoose集合
     let resultsByType       = {};
     let unplayedByType      = {};
     let scoreRows           = null;
@@ -817,14 +809,16 @@
           radarMapByType[type] = { strict: strictMap, loose: looseMap };
         }
 
-        // 補完レベルマップを構築
+        // 補完レベルマップ・タイトル集合を構築
         if (supplementText) {
           const { rows: supRows } = parseCSV(supplementText);
           supplementLevelMap = new Map();
+          supplementTitleSet = new Set();
           for (const row of supRows) {
             const rawTitle = (row['TITLE'] || '').trim();
             if (!rawTitle) continue;
             const tk = titleKeyLoose(rawTitle);
+            supplementTitleSet.add(tk);
             for (const { col, abbr } of SUPPLEMENT_COL_MAP) {
               const level = (row[col] || '').trim();
               if (level && level !== '-') supplementLevelMap.set(`${tk}::${abbr}`, level);
@@ -1064,9 +1058,12 @@
           if (strictPlayedSet.has(strictKey) || scoreLoosePlayedSet.has(looseKey)) continue;
           const diffEntry = DIFF_MAP.find(d => d.abbr === diffAbbr);
           if (!diffEntry) continue;
-          if (UNPLAYED_EXCLUDE.has(radar.rawTitle)) continue;
           const aliasTitle = RADAR_TITLE_ALIAS.get(radar.rawTitle);
           const aliasKey   = aliasTitle ? `${titleKeyLoose(aliasTitle)}::${diffAbbr}` : null;
+          // 補完スプレッドシート（IIDX Difficulty）に存在しない曲は除外
+          const inSupplement = supplementTitleSet.has(titleKeyLoose(radar.rawTitle))
+                            || (aliasTitle && supplementTitleSet.has(titleKeyLoose(aliasTitle)));
+          if (!inSupplement) continue;
           const rawLevel = levelMap.get(looseKey);
           const level = (rawLevel && rawLevel !== '0' ? rawLevel : null)
                      || supplementLevelMap.get(looseKey)
