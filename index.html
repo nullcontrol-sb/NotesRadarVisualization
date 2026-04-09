@@ -1058,7 +1058,8 @@
                      || (aliasKey ? supplementLevelMap.get(aliasKey) : '')
                      || '';
           const maxEx = radar.notes * 2;
-          unplayed.push({ title: radar.rawTitle, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
+          const displayRawTitle = RADAR_TITLE_ALIAS.get(radar.rawTitle) || radar.rawTitle;
+          unplayed.push({ title: displayRawTitle, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
         }
 
         unplayed.sort((a, b) => b.radarMax - a.radarMax);
