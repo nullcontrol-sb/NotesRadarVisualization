@@ -1040,6 +1040,7 @@
       }
 
       // 第2パス: unplayedByType を構築
+      const excludedFromUnplayed = new Set(); // 補完CSV不在により除外された曲（NOTES基準）
       for (const type of RADAR_TYPES) {
         const maps = radarMapByType[type];
         if (!maps || maps.strict.size === 0) continue;
@@ -1063,7 +1064,10 @@
           // 補完スプレッドシート（IIDX Difficulty）に存在しない曲は除外
           const inSupplement = supplementTitleSet.has(titleKeyLoose(radar.rawTitle))
                             || (aliasTitle && supplementTitleSet.has(titleKeyLoose(aliasTitle)));
-          if (!inSupplement) continue;
+          if (!inSupplement) {
+            if (type === 'NOTES') excludedFromUnplayed.add(radar.rawTitle);
+            continue;
+          }
           const rawLevel = levelMap.get(looseKey);
           const level = (rawLevel && rawLevel !== '0' ? rawLevel : null)
                      || supplementLevelMap.get(looseKey)
@@ -1076,6 +1080,15 @@
 
         unplayed.sort((a, b) => b.radarMax - a.radarMax);
         unplayedByType[type] = unplayed;
+      }
+
+      // 補完CSV不在により除外された曲をログ出力（検証用）
+      if (excludedFromUnplayed.size > 0) {
+        console.group(`[未プレイ除外] 補完CSVに存在しないためリストから除外 (${excludedFromUnplayed.size}曲)`);
+        [...excludedFromUnplayed].sort().forEach(t => console.log(t));
+        console.groupEnd();
+      } else {
+        console.log('[未プレイ除外] 補完CSV不在による除外曲なし');
       }
 
       if (Object.keys(resultsByType).length === 0) {
