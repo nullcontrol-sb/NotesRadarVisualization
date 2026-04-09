@@ -700,6 +700,12 @@
       return TITLE_DISPLAY_OVERRIDE.get(rawTitle) ?? rawTitle;
     }
 
+    // レーダーCSVのタイトル切れ → 補完スプレッドシートの正式タイトル へのエイリアス
+    // レーダーCSV側のタイトルが途中で切れている場合にここへ追加する
+    const RADAR_TITLE_ALIAS = new Map([
+      ['灼熱Beach Side Bunny (Masayoshi Iimori Remi', '灼熱Beach Side Bunny (Masayoshi Iimori Remix)'],
+    ]);
+
     // 未プレイ一覧から除外するタイトル（rawTitle の完全一致）
     const UNPLAYED_EXCLUDE = new Set([
       'デモーニッシュ',
@@ -1045,7 +1051,12 @@
           const diffEntry = DIFF_MAP.find(d => d.abbr === diffAbbr);
           if (!diffEntry) continue;
           if (UNPLAYED_EXCLUDE.has(radar.rawTitle)) continue;
-          const level = levelMap.get(looseKey) || supplementLevelMap.get(looseKey) || '';
+          const aliasTitle = RADAR_TITLE_ALIAS.get(radar.rawTitle);
+          const aliasKey   = aliasTitle ? `${titleKeyLoose(aliasTitle)}::${diffAbbr}` : null;
+          const level = levelMap.get(looseKey)
+                     || supplementLevelMap.get(looseKey)
+                     || (aliasKey ? supplementLevelMap.get(aliasKey) : '')
+                     || '';
           const maxEx = radar.notes * 2;
           unplayed.push({ title: radar.rawTitle, diffFull: diffEntry.full, diffAbbr, level, radarMax: radar.max, maxEx });
         }
