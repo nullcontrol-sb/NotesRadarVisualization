@@ -213,7 +213,8 @@
             <thead>
               <tr>
                 <th>レーダーCSVのタイトル（切れあり）</th>
-                <th>補完スプレッドシートの対応タイトル（推定）</th>
+                <th>末尾差分（不足文字）</th>
+                <th>補完スプレッドシートの正式タイトル</th>
                 <th>難易度（SP B/N/H/A/L）</th>
               </tr>
             </thead>
@@ -379,29 +380,28 @@
             matchedSuppKeys.add(radarLoose);
             continue;
           }
-          // 類似検索: 補完側のkeyがradarLooseから始まるか（補完が長い＝radarが切れている）
-          // または radarLooseがsuppKeyから始まるか（補完が短い＝補完側が切れている）
+          // 文末切れ検出: 補完keyがradarLooseで始まる かつ カバー率75%以上
+          // （短すぎるprefix一致による誤検出を防ぐ）
+          const MIN_LOOSE_LEN = 6;
+          const MIN_COVERAGE  = 0.75;
           let fuzzy = null;
-          let fuzzyType = null;
-          for (const [suppLoose, suppEntry] of suppMap) {
-            if (suppLoose.startsWith(radarLoose) && suppLoose.length > radarLoose.length) {
-              fuzzy = suppEntry;
-              fuzzyType = 'radar_truncated'; // レーダーCSVが切れている
-              break;
-            }
-            if (radarLoose.startsWith(suppLoose) && radarLoose.length > suppLoose.length) {
-              fuzzy = suppEntry;
-              fuzzyType = 'supp_truncated'; // 補完CSVが切れている
-              break;
+          if (radarLoose.length >= MIN_LOOSE_LEN) {
+            for (const [suppLoose, suppEntry] of suppMap) {
+              if (suppLoose.startsWith(radarLoose)
+                  && suppLoose.length > radarLoose.length
+                  && radarLoose.length / suppLoose.length >= MIN_COVERAGE) {
+                fuzzy = suppEntry;
+                break;
+              }
             }
           }
           if (fuzzy) {
             matchedSuppKeys.add(titleKeyLoose(fuzzy.rawTitle));
             truncatedPairs.push({
               radarTitle: radarRaw,
-              suppTitle: fuzzy.rawTitle,
-              fuzzyType,
-              row: fuzzy.row,
+              suppTitle:  fuzzy.rawTitle,
+              tailDiff:   rawTailDiff(radarRaw, fuzzy.rawTitle),
+              row:        fuzzy.row,
             });
           } else {
             missingTitles.push(radarRaw);
@@ -444,6 +444,14 @@
       }
     }
 
+    // レーダータイトルと補完タイトルを先頭から比較し、補完タイトルの末尾差分を返す
+    function rawTailDiff(radarRaw, suppRaw) {
+      let i = 0;
+      const minLen = Math.min(radarRaw.length, suppRaw.length);
+      while (i < minLen && radarRaw[i] === suppRaw[i]) i++;
+      return suppRaw.slice(i); // レーダーに存在しない末尾部分
+    }
+
     function formatLevels(row) {
       return ['SP_B','SP_N','SP_H','SP_A','SP_L'].map(c => {
         const v = row[c] || '-';
@@ -463,12 +471,10 @@
       tbody.closest('table').classList.remove('hidden');
       empty.classList.add('hidden');
       for (const p of pairs) {
-        const typeLabel = p.fuzzyType === 'radar_truncated'
-          ? '<span class="badge badge-truncated">レーダー側が切れ</span>'
-          : '<span class="badge badge-truncated">補完側が切れ</span>';
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="title-cell">${esc(p.radarTitle)}<br>${typeLabel}</td>
+          <td class="title-cell">${esc(p.radarTitle)}</td>
+          <td style="color:#f6ad55;font-family:monospace;font-size:13px;white-space:nowrap;">${esc(p.tailDiff)}</td>
           <td class="suggest-cell">${esc(p.suppTitle)}</td>
           <td class="levels-cell">${esc(formatLevels(p.row))}</td>
         `;
