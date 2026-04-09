@@ -276,8 +276,10 @@
     }
     function titleKeyLoose(title) {
       return normalizeQuotes(title.trim()).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
-        .replace(/[øœ]/g, 'o').replace(/ł/g, 'l').replace(/đ/g, 'd')
+        .replace(/[øœ]/g, 'o').replace(/æ/g, 'ae').replace(/ə/g, 'e')
+        .replace(/ł/g, 'l').replace(/đ/g, 'd')
         .replace(/ħ/g, 'h').replace(/ŧ/g, 't').replace(/ŋ/g, 'n')
+        .replace(/[\u3041-\u3096]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60)) // ひらがな→カタカナ
         .replace(/[^a-z0-9\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/gu, '');
     }
 

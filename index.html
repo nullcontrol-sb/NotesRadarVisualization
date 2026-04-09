@@ -713,10 +713,10 @@
       return TITLE_DISPLAY_OVERRIDE.get(rawTitle) ?? rawTitle;
     }
 
-    // レーダーCSVのタイトル切れ → 補完スプレッドシートの正式タイトル へのエイリアス
-    // レーダーCSV側のタイトルが途中で切れている場合にここへ追加する
+    // レーダーCSVのタイトル切れ・表記差異 → 補完スプレッドシートの正式タイトル へのエイリアス
     const RADAR_TITLE_ALIAS = new Map([
       ['灼熱Beach Side Bunny (Masayoshi Iimori Remi', '灼熱Beach Side Bunny (Masayoshi Iimori Remix)'],
+      ["'.59", '0.59'], // レーダーCSVは"'.59"、補完CSVは"0.59"
     ]);
 
     const DIFF_MAP = [
@@ -936,8 +936,10 @@
     // NFKDで分解されないストローク付きラテン文字はASCII相当に変換してから除去
     function titleKeyLoose(title) {
       return normalizeQuotes(title.trim()).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
-        .replace(/[øœ]/g, 'o').replace(/ł/g, 'l').replace(/đ/g, 'd')
+        .replace(/[øœ]/g, 'o').replace(/æ/g, 'ae').replace(/ə/g, 'e')
+        .replace(/ł/g, 'l').replace(/đ/g, 'd')
         .replace(/ħ/g, 'h').replace(/ŧ/g, 't').replace(/ŋ/g, 'n')
+        .replace(/[\u3041-\u3096]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60)) // ひらがな→カタカナ
         .replace(/[^a-z0-9\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/gu, '');
     }
     function titleKey(title) { return titleKeyStrict(title); }
@@ -1040,7 +1042,7 @@
       }
 
       // 第2パス: unplayedByType を構築
-      const excludedFromUnplayed = new Set(); // 補完CSV不在により除外された曲（NOTES基準）
+      const excludedFromUnplayed = new Map(); // 補完CSV不在により除外された曲: rawTitle → looseKey（NOTES基準）
       for (const type of RADAR_TYPES) {
         const maps = radarMapByType[type];
         if (!maps || maps.strict.size === 0) continue;
@@ -1065,7 +1067,7 @@
           const inSupplement = supplementTitleSet.has(titleKeyLoose(radar.rawTitle))
                             || (aliasTitle && supplementTitleSet.has(titleKeyLoose(aliasTitle)));
           if (!inSupplement) {
-            if (type === 'NOTES') excludedFromUnplayed.add(radar.rawTitle);
+            if (type === 'NOTES') excludedFromUnplayed.set(radar.rawTitle, titleKeyLoose(radar.rawTitle));
             continue;
           }
           const rawLevel = levelMap.get(looseKey);
@@ -1085,7 +1087,8 @@
       // 補完CSV不在により除外された曲をログ出力（検証用）
       if (excludedFromUnplayed.size > 0) {
         console.group(`[未プレイ除外] 補完CSVに存在しないためリストから除外 (${excludedFromUnplayed.size}曲)`);
-        [...excludedFromUnplayed].sort().forEach(t => console.log(t));
+        [...excludedFromUnplayed.entries()].sort(([a], [b]) => a.localeCompare(b))
+          .forEach(([title, key]) => console.log(`${title}  →  key:"${key}"`));
         console.groupEnd();
       } else {
         console.log('[未プレイ除外] 補完CSV不在による除外曲なし');
