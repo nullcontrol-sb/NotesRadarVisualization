@@ -716,8 +716,10 @@
     // レーダーCSVのタイトル切れ・表記差異 → 補完スプレッドシートの正式タイトル へのエイリアス
     const RADAR_TITLE_ALIAS = new Map([
       ['灼熱Beach Side Bunny (Masayoshi Iimori Remi', '灼熱Beach Side Bunny (Masayoshi Iimori Remix)'],
-      ['.59', '0.59'],                     // レーダーCSVは".59"、補完CSVは"0.59"
+      ['.59', '0.59'],                       // レーダーCSVは".59"、補完CSVは"0.59"
       ['BALLAD THE FEÆTHERS', 'BALLAD THE FEATHERS'], // レーダーCSVはÆ表記、補完CSVはAEなし
+      ['ACT0', 'ACTØ'],                      // レーダーCSVは digit "0"、補完CSVは "Ø"
+      ['POLKAMANIA', 'POLꓘAMAИIA'],          // レーダーCSVはASCII、補完CSVはLisu/キリル文字混じり
     ]);
 
     const DIFF_MAP = [
