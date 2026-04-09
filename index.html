@@ -695,6 +695,7 @@
     // 表示名上書き: スコアCSVのタイトル → 正式な表示名
     const TITLE_DISPLAY_OVERRIDE = new Map([
       ['0.59', '.59'],
+      ['VOID', 'VØID'],
     ]);
     function displayTitle(rawTitle) {
       return TITLE_DISPLAY_OVERRIDE.get(rawTitle) ?? rawTitle;
@@ -1159,10 +1160,10 @@
       </tr>`;
       document.getElementById('avg-value').style.display = '';
 
-      // タイトル重複排除: タイトルごとに最高radarValueの難易度を代表とする
-      const repMap = new Map(); // title → 代表エントリ
+      // タイトル重複排除: titleKeyLooseで正規化したキーで同一曲判定
+      const repMap = new Map(); // titleKeyLoose → 代表エントリ
       for (const r of results) {
-        if (!repMap.has(r.title)) repMap.set(r.title, r);
+        if (!repMap.has(titleKeyLoose(r.title))) repMap.set(titleKeyLoose(r.title), r);
       }
       // 代表リスト (resultsがradarValue降順なので挿入順 = 降順)
       const repList = [...repMap.values()];
@@ -1172,17 +1173,17 @@
 
       // TOP10 (代表)
       const repTop10 = repList.slice(0, 10);
-      const repTop10Keys = new Set(repTop10.map(r => r.title + '::' + r.diffAbbr));
+      const repTop10Keys = new Set(repTop10.map(r => titleKeyLoose(r.title) + '::' + r.diffAbbr));
 
       // 弾き出し: 生の上位10件の中にいた非代表エントリのみ
       // (代表の方が必ず高いradarValueなので、代表も必ずTOP10内に存在する)
-      const displaced = results.slice(0, 10).filter(r => repMap.get(r.title) !== r);
-      const displacedKeys = new Set(displaced.map(r => r.title + '::' + r.diffAbbr));
+      const displaced = results.slice(0, 10).filter(r => repMap.get(titleKeyLoose(r.title)) !== r);
+      const displacedKeys = new Set(displaced.map(r => titleKeyLoose(r.title) + '::' + r.diffAbbr));
 
       // 11位以降: repTop10・displaced を除いた残り上位10件
       // 代表・非代表どちらも含む（非代表はガイダンスを同タイトル代表との比較に変更）
       const bottomEntries = results.filter(r => {
-        const key = r.title + '::' + r.diffAbbr;
+        const key = titleKeyLoose(r.title) + '::' + r.diffAbbr;
         return !repTop10Keys.has(key) && !displacedKeys.has(key);
       }).slice(0, 10);
 
@@ -1226,7 +1227,7 @@
       repTop10.forEach((r, i) => rows.push(makeRow(r, i + 1, '')));
       // 弾き出されたエントリ (同タイトル代表との差分ガイダンス付き)
       if (!hideAlts) displaced.forEach(r => {
-        const rep = repMap.get(r.title);
+        const rep = repMap.get(titleKeyLoose(r.title));
         const guidanceHtml = makeGuidanceHtml(r, rep ? rep.radarValue : null, true);
         const { nearestName, diff: djDiff } = getDJLevelInfo(r.score, r.maxEx);
         const sign = (djDiff >= 0 && nearestName !== 'MAX-') ? '+' : '';
@@ -1247,9 +1248,9 @@
       const bottomList = hideAlts ? repRest : bottomEntries;
       bottomList.forEach((r, i) => {
         const rank = i + 11;
-        const isRep = repMap.get(r.title) === r;
+        const isRep = repMap.get(titleKeyLoose(r.title)) === r;
         // 非代表の場合は同タイトル代表との比較、代表はTOP10閾値との比較
-        const guidanceThreshold = isRep ? top10threshold : (repMap.get(r.title)?.radarValue ?? null);
+        const guidanceThreshold = isRep ? top10threshold : (repMap.get(titleKeyLoose(r.title))?.radarValue ?? null);
         const guidanceHtml = makeGuidanceHtml(r, guidanceThreshold, !isRep);
         const { nearestName, diff: djDiff } = getDJLevelInfo(r.score, r.maxEx);
         const sign = (djDiff >= 0 && nearestName !== 'MAX-') ? '+' : '';
