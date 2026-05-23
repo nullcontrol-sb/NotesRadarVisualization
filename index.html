@@ -1475,11 +1475,14 @@
       }
       const total = RADAR_TYPES.reduce((s, t) => s + values[t], 0);
 
+      // 角度順に並べた型リスト（ポリゴンの頂点が交差しないよう時計回りに接続）
+      const sortedTypes = [...RADAR_TYPES].sort((a, b) => CHART_ANGLE[a] - CHART_ANGLE[b]);
+
       let svg = '';
       // グリッド六角形（5段階）
       for (let i = 1; i <= 5; i++) {
         const gr = r * i / 5;
-        const pts = RADAR_TYPES.map(t => pt(t, gr).map(v => v.toFixed(1)).join(',')).join(' ');
+        const pts = sortedTypes.map(t => pt(t, gr).map(v => v.toFixed(1)).join(',')).join(' ');
         svg += `<polygon points="${pts}" fill="${i === 5 ? 'rgba(15,52,96,0.3)' : 'none'}" stroke="#1e3a6e" stroke-width="1"/>`;
       }
       // 軸線
@@ -1488,7 +1491,7 @@
         svg += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#1e3a6e" stroke-width="1"/>`;
       }
       // データポリゴン
-      const dataPts = RADAR_TYPES.map(t => {
+      const dataPts = sortedTypes.map(t => {
         const ratio = Math.min(values[t] / CHART_MAX, 1);
         return pt(t, r * ratio).map(v => v.toFixed(1)).join(',');
       }).join(' ');
