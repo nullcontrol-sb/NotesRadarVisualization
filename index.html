@@ -810,6 +810,7 @@
     let resultsByType       = {};
     let unplayedByType      = {};
     let scoreRows           = null;
+    let prevRadarValues     = null; // インポート前のレーダー値（差分表示用）
     let activeTab            = 'NOTES';
     let viewMode             = 'played'; // 'played' | 'unplayed'
     let unplayedLevelFilter  = '';       // 未プレイ ☆フィルタ値（''=すべて）
@@ -948,7 +949,26 @@
       });
     }
 
+    function computeRadarValues() {
+      const values = {};
+      for (const type of RADAR_TYPES) {
+        const results = resultsByType[type];
+        if (!results || results.length === 0) { values[type] = 0; continue; }
+        const repMap = new Map();
+        for (const r of results) {
+          if (!repMap.has(titleKeyForDedup(r.title))) repMap.set(titleKeyForDedup(r.title), r);
+        }
+        const top10 = [...repMap.values()].slice(0, 10);
+        values[type] = Math.floor(
+          (top10.length > 0 ? top10.reduce((s, r) => s + Math.floor(r.radarValue * 100) / 100, 0) / top10.length : 0)
+          * 100) / 100;
+      }
+      return values;
+    }
+
     function loadScoreText(text, label) {
+      // 既にデータ算出済みの場合、インポート前の値を差分表示用に保存
+      prevRadarValues = Object.keys(resultsByType).length > 0 ? computeRadarValues() : null;
       const { rows } = parseCSV(text);
       scoreRows = rows;
       localStorage.setItem('scoreCSV',     text);
@@ -1489,21 +1509,9 @@
         return [cx + radius * Math.cos(a), cy + radius * Math.sin(a)];
       };
 
-      const values = {};
-      for (const type of RADAR_TYPES) {
-        const results = resultsByType[type];
-        if (!results || results.length === 0) { values[type] = 0; continue; }
-        const repMap = new Map();
-        for (const r of results) {
-          if (!repMap.has(titleKeyForDedup(r.title))) repMap.set(titleKeyForDedup(r.title), r);
-        }
-        const top10 = [...repMap.values()].slice(0, 10);
-        const avg = top10.length > 0
-          ? top10.reduce((s, r) => s + Math.floor(r.radarValue * 100) / 100, 0) / top10.length
-          : 0;
-        values[type] = Math.floor(avg * 100) / 100;
-      }
-      const total = RADAR_TYPES.reduce((s, t) => s + values[t], 0);
+      const values = computeRadarValues();
+      const total  = RADAR_TYPES.reduce((s, t) => s + values[t], 0);
+      const prevTotal = prevRadarValues ? RADAR_TYPES.reduce((s, t) => s + prevRadarValues[t], 0) : null;
 
       // 角度順に並べた型リスト（ポリゴンの頂点が交差しないよう時計回りに接続）
       const sortedTypes = [...RADAR_TYPES].sort((a, b) => CHART_ANGLE[a] - CHART_ANGLE[b]);
@@ -1520,7 +1528,20 @@
         const [x, y] = pt(type, r);
         svg += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#1e3a6e" stroke-width="1"/>`;
       }
-      // データポリゴン
+      // 更新前ポリゴン（差分表示時のみ）
+      if (prevRadarValues) {
+        const prevPts = sortedTypes.map(t => {
+          const ratio = Math.min(prevRadarValues[t] / CHART_MAX, 1);
+          return pt(t, r * ratio).map(v => v.toFixed(1)).join(',');
+        }).join(' ');
+        svg += `<polygon points="${prevPts}" fill="rgba(104,211,145,0.08)" stroke="#4a7a5a" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+        for (const type of RADAR_TYPES) {
+          const ratio = Math.min(prevRadarValues[type] / CHART_MAX, 1);
+          const [x, y] = pt(type, r * ratio);
+          svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="#4a7a5a" stroke="#1a1a2e" stroke-width="1"/>`;
+        }
+      }
+      // 現在のポリゴン
       const dataPts = sortedTypes.map(t => {
         const ratio = Math.min(values[t] / CHART_MAX, 1);
         return pt(t, r * ratio).map(v => v.toFixed(1)).join(',');
@@ -1541,16 +1562,38 @@
       }
       document.getElementById('radar-svg').innerHTML = svg;
 
-      const rows = RADAR_TYPES.map(t =>
-        `<div class="chart-val-row">
+      // 値リスト（差分あり/なしで切替）
+      const rows = RADAR_TYPES.map(t => {
+        const curr = values[t].toFixed(2);
+        if (prevRadarValues) {
+          const prev = prevRadarValues[t].toFixed(2);
+          const diff = values[t] - prevRadarValues[t];
+          const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(2);
+          const diffColor = diff > 0 ? '#68d391' : diff < 0 ? '#fc8181' : '#718096';
+          return `<div class="chart-val-row">
+            <span class="chart-val-label" style="color:${RADAR_COLORS[t]}">${t}</span>
+            <span class="chart-val-num"><span style="color:#4a5568;font-size:11px;">${prev}⇒</span>${curr}<span style="color:${diffColor};font-size:11px;margin-left:4px;">(${diffStr})</span></span>
+          </div>`;
+        }
+        return `<div class="chart-val-row">
           <span class="chart-val-label" style="color:${RADAR_COLORS[t]}">${t}</span>
-          <span class="chart-val-num">${values[t].toFixed(2)}</span>
-        </div>`
-      ).join('');
+          <span class="chart-val-num">${curr}</span>
+        </div>`;
+      }).join('');
+
+      const totalNumHtml = prevRadarValues
+        ? (() => {
+            const diff = total - prevTotal;
+            const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(2);
+            const diffColor = diff > 0 ? '#68d391' : diff < 0 ? '#fc8181' : '#718096';
+            return `<span style="color:#4a5568;font-size:11px;">${prevTotal.toFixed(2)}⇒</span>${total.toFixed(2)}<span style="color:${diffColor};font-size:11px;margin-left:4px;">(${diffStr})</span>`;
+          })()
+        : total.toFixed(2);
+
       document.getElementById('chart-values').innerHTML = rows +
         `<div class="chart-val-row chart-val-total">
           <span class="chart-val-label">合計レーダースコア</span>
-          <span class="chart-val-num">${total.toFixed(2)}</span>
+          <span class="chart-val-num">${totalNumHtml}</span>
         </div>`;
 
       document.getElementById('chart-section').classList.remove('hidden');
