@@ -10,6 +10,9 @@
   <meta property="og:description" content="beatmania IIDX SPのスコアCSVを読み込み、ノーツレーダー値の上位曲・未プレイ曲をランキング表示するツールです。">
   <meta property="og:type" content="website">
   <meta name="google-site-verification" content="2kzQ6lfHtO_rR-YDOkBqzEDMxeS7dmfhtDcUjlsWJs4" />
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebSite","name":"IIDX ノーツレーダー可視化ツール","url":"https://notes-radar-visualization.netlify.app/"}
+  </script>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-GMMBWPQYVM"></script>
   <script>
@@ -557,6 +560,35 @@
       font-size: 13px;
       margin-top: 12px;
     }
+
+    .chart-section {
+      max-width: 480px;
+      margin: 24px auto 0;
+      padding: 0 20px;
+    }
+    .chart-inner {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 14px;
+      padding: 20px 20px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #radar-svg { width: 100%; max-width: 280px; display: block; overflow: visible; }
+    .chart-values { margin-top: 12px; width: 100%; max-width: 220px; }
+    .chart-val-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      font-size: 13px;
+    }
+    .chart-val-label { font-weight: 700; letter-spacing: 0.04em; }
+    .chart-val-num { color: #e2e8f0; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .chart-val-total { border-top: 1px solid #0f3460; margin-top: 6px; padding-top: 8px; }
+    .chart-val-total .chart-val-label { color: #a0aec0; }
+    .chart-val-total .chart-val-num { color: #a0d8ef; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -598,6 +630,13 @@
 
   <div id="error-area" class="result-section hidden">
     <div class="error-msg" id="error-msg"></div>
+  </div>
+
+  <div class="chart-section hidden" id="chart-section">
+    <div class="chart-inner">
+      <svg id="radar-svg" viewBox="0 0 340 305"></svg>
+      <div id="chart-values" class="chart-values"></div>
+    </div>
   </div>
 
   <div class="result-section hidden" id="result-section">
@@ -772,6 +811,25 @@
       sp.style.display = state === 'loading' ? '' : 'none';
       tx.textContent = text;
     }
+
+    // レーダーチャート用定数
+    const RADAR_COLORS = {
+      'NOTES':   '#68d391',
+      'CHORD':   '#76e4f7',
+      'PEAK':    '#93c5fd',
+      'CHARGE':  '#f687b3',
+      'SCRATCH': '#fde68a',
+      'SOF-LAN': '#f6ad55',
+    };
+    const CHART_ANGLE = {
+      'NOTES':   -Math.PI / 2,
+      'PEAK':    -Math.PI / 6,
+      'SCRATCH':  Math.PI / 6,
+      'SOF-LAN':  Math.PI / 2,
+      'CHARGE':   5 * Math.PI / 6,
+      'CHORD':   -5 * Math.PI / 6,
+    };
+    const CHART_MAX = 200;
 
     // 補完レベルCSVの列名と DIFF_MAP の abbr の対応
     const SUPPLEMENT_COL_MAP = [
@@ -1099,6 +1157,7 @@
 
       document.getElementById('result-section').classList.remove('hidden');
       renderCurrentTab();
+      renderRadarChart();
     }
 
     // ── DJ LEVEL 算出 ────────────────────────
@@ -1390,6 +1449,78 @@
 
       document.getElementById('info-text').textContent =
         `${activeTab} — 未プレイ上位 20 件表示`;
+    }
+
+    // ── レーダーチャート描画 ──────────────────
+    function renderRadarChart() {
+      const cx = 170, cy = 155, r = 95, labelR = 122;
+      const pt = (type, radius) => {
+        const a = CHART_ANGLE[type];
+        return [cx + radius * Math.cos(a), cy + radius * Math.sin(a)];
+      };
+
+      const values = {};
+      for (const type of RADAR_TYPES) {
+        const results = resultsByType[type];
+        if (!results || results.length === 0) { values[type] = 0; continue; }
+        const repMap = new Map();
+        for (const r of results) {
+          if (!repMap.has(titleKeyForDedup(r.title))) repMap.set(titleKeyForDedup(r.title), r);
+        }
+        const top10 = [...repMap.values()].slice(0, 10);
+        const avg = top10.length > 0
+          ? top10.reduce((s, r) => s + Math.floor(r.radarValue * 100) / 100, 0) / top10.length
+          : 0;
+        values[type] = Math.floor(avg * 100) / 100;
+      }
+      const total = RADAR_TYPES.reduce((s, t) => s + values[t], 0);
+
+      let svg = '';
+      // グリッド六角形（5段階）
+      for (let i = 1; i <= 5; i++) {
+        const gr = r * i / 5;
+        const pts = RADAR_TYPES.map(t => pt(t, gr).map(v => v.toFixed(1)).join(',')).join(' ');
+        svg += `<polygon points="${pts}" fill="${i === 5 ? 'rgba(15,52,96,0.3)' : 'none'}" stroke="#1e3a6e" stroke-width="1"/>`;
+      }
+      // 軸線
+      for (const type of RADAR_TYPES) {
+        const [x, y] = pt(type, r);
+        svg += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#1e3a6e" stroke-width="1"/>`;
+      }
+      // データポリゴン
+      const dataPts = RADAR_TYPES.map(t => {
+        const ratio = Math.min(values[t] / CHART_MAX, 1);
+        return pt(t, r * ratio).map(v => v.toFixed(1)).join(',');
+      }).join(' ');
+      svg += `<polygon points="${dataPts}" fill="rgba(104,211,145,0.35)" stroke="#68d391" stroke-width="2"/>`;
+      // データ点
+      for (const type of RADAR_TYPES) {
+        const ratio = Math.min(values[type] / CHART_MAX, 1);
+        const [x, y] = pt(type, r * ratio);
+        svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${RADAR_COLORS[type]}" stroke="#1a1a2e" stroke-width="1"/>`;
+      }
+      // ラベル
+      for (const type of RADAR_TYPES) {
+        const [x, y] = pt(type, labelR);
+        const cosA = Math.cos(CHART_ANGLE[type]);
+        const anchor = cosA > 0.3 ? 'start' : cosA < -0.3 ? 'end' : 'middle';
+        svg += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="${RADAR_COLORS[type]}" font-size="11" font-weight="700" font-family="'Segoe UI',sans-serif">${type}</text>`;
+      }
+      document.getElementById('radar-svg').innerHTML = svg;
+
+      const rows = RADAR_TYPES.map(t =>
+        `<div class="chart-val-row">
+          <span class="chart-val-label" style="color:${RADAR_COLORS[t]}">${t}</span>
+          <span class="chart-val-num">${values[t].toFixed(2)}</span>
+        </div>`
+      ).join('');
+      document.getElementById('chart-values').innerHTML = rows +
+        `<div class="chart-val-row chart-val-total">
+          <span class="chart-val-label">合計レーダースコア</span>
+          <span class="chart-val-num">${total.toFixed(2)}</span>
+        </div>`;
+
+      document.getElementById('chart-section').classList.remove('hidden');
     }
 
     // ── 行選択（タップ/クリックでトグル・localStorage永続化）────────────────
