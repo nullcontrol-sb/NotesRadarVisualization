@@ -1513,6 +1513,13 @@
       const total  = RADAR_TYPES.reduce((s, t) => s + values[t], 0);
       const prevTotal = prevRadarValues ? RADAR_TYPES.reduce((s, t) => s + prevRadarValues[t], 0) : null;
 
+      // 全値が100以上のとき中心を100に設定して差分を見やすくする
+      const allDisplayValues = [...Object.values(values),
+        ...(prevRadarValues ? Object.values(prevRadarValues) : [])];
+      const chartBase  = allDisplayValues.every(v => v >= 100) ? 100 : 0;
+      const chartRange = CHART_MAX - chartBase;
+      const toRatio = v => Math.max(0, Math.min((v - chartBase) / chartRange, 1));
+
       // 角度順に並べた型リスト（ポリゴンの頂点が交差しないよう時計回りに接続）
       const sortedTypes = [...RADAR_TYPES].sort((a, b) => CHART_ANGLE[a] - CHART_ANGLE[b]);
 
@@ -1531,27 +1538,28 @@
       // 更新前ポリゴン（差分表示時のみ）
       if (prevRadarValues) {
         const prevPts = sortedTypes.map(t => {
-          const ratio = Math.min(prevRadarValues[t] / CHART_MAX, 1);
-          return pt(t, r * ratio).map(v => v.toFixed(1)).join(',');
+          return pt(t, r * toRatio(prevRadarValues[t])).map(v => v.toFixed(1)).join(',');
         }).join(' ');
         svg += `<polygon points="${prevPts}" fill="rgba(104,211,145,0.08)" stroke="#4a7a5a" stroke-width="1.5" stroke-dasharray="4,3"/>`;
         for (const type of RADAR_TYPES) {
-          const ratio = Math.min(prevRadarValues[type] / CHART_MAX, 1);
-          const [x, y] = pt(type, r * ratio);
+          const [x, y] = pt(type, r * toRatio(prevRadarValues[type]));
           svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="#4a7a5a" stroke="#1a1a2e" stroke-width="1"/>`;
         }
       }
       // 現在のポリゴン
       const dataPts = sortedTypes.map(t => {
-        const ratio = Math.min(values[t] / CHART_MAX, 1);
-        return pt(t, r * ratio).map(v => v.toFixed(1)).join(',');
+        return pt(t, r * toRatio(values[t])).map(v => v.toFixed(1)).join(',');
       }).join(' ');
       svg += `<polygon points="${dataPts}" fill="rgba(104,211,145,0.35)" stroke="#68d391" stroke-width="2"/>`;
       // データ点
       for (const type of RADAR_TYPES) {
-        const ratio = Math.min(values[type] / CHART_MAX, 1);
-        const [x, y] = pt(type, r * ratio);
+        const [x, y] = pt(type, r * toRatio(values[type]));
         svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${RADAR_COLORS[type]}" stroke="#1a1a2e" stroke-width="1"/>`;
+      }
+      // 縮尺オフセットラベル（中心に基準値を表示）
+      if (chartBase > 0) {
+        svg += `<circle cx="${cx}" cy="${cy}" r="10" fill="#1a1a2e"/>`;
+        svg += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" fill="#4a5568" font-size="9" font-family="'Segoe UI',sans-serif">${chartBase}</text>`;
       }
       // ラベル
       for (const type of RADAR_TYPES) {
