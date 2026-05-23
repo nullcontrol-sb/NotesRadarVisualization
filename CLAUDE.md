@@ -123,6 +123,18 @@ unplayedLevelFilter 未プレイ一覧の☆フィルタ値（''=すべて）
 
 ---
 
+## デプロイ構成
+
+| ブランチ | 環境 | URL | トリガー |
+|---|---|---|---|
+| `main` | 本番 | https://notes-radar-visualization.netlify.app/ | main へのマージ時に Netlify が自動デプロイ |
+| `develop` | 開発確認用 | https://nullcontrol-sb.github.io/NotesRadarVisualization/ | develop への push 時に GitHub Actions が自動デプロイ |
+
+- ワークフロー定義: `.github/workflows/deploy-pages.yml`
+- `maintenance.html` と `CLAUDE.md` は main にマージしない（develop のみ）
+
+---
+
 ## 既知の表記差異と対処パターン
 
 | 問題 | 対処 |
