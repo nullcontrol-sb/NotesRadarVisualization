@@ -1859,8 +1859,7 @@
         if (prevRadarValues !== null) {
           const prevTotal = RADAR_TYPES.reduce((s, t) => s + prevRadarValues[t], 0);
           const totalDiff = total - prevTotal;
-          const diffStr   = (totalDiff >= 0 ? '+' : '') + totalDiff.toFixed(2);
-          tweetText = `ノーツレーダーが${diffStr}伸びました！\n\n${tags}`;
+          tweetText = `ノーツレーダーが${totalDiff.toFixed(2)}伸びました！\n\n${tags}`;
         } else {
           tweetText = `今のノーツレーダーはこれ！\n\n${tags}`;
         }
