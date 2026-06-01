@@ -1868,8 +1868,9 @@
         const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
         const file = new File([blob], 'iidx-notes-radar.png', { type: 'image/png' });
 
-        // ① Web Share API（スマホ・対応デスクトップ）
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        // ① Web Share API（スマホのみ）
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({ files: [file], text: tweetText });
             noticeEl.textContent = '';
