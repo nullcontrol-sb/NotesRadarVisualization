@@ -41,17 +41,17 @@
   <text x="148"   y="229"   text-anchor="end"    dominant-baseline="middle" font-family="'Segoe UI', sans-serif" font-size="18" font-weight="700" fill="#86efac">CHORD</text>
 
   <!-- ── Right Side ── -->
-  <line x1="622" y1="92" x2="622" y2="578" stroke="#0f3460" stroke-width="2"/>
+  <line x1="660" y1="92" x2="660" y2="578" stroke="#0f3460" stroke-width="2"/>
   <!-- Title -->
-  <text x="662" y="175" font-family="'Segoe UI', sans-serif" font-size="46" font-weight="700" fill="#a0d8ef">ノーツレーダー</text>
-  <text x="662" y="228" font-family="'Segoe UI', sans-serif" font-size="34" font-weight="700" fill="#a0d8ef">可視化ツール</text>
+  <text x="694" y="175" font-family="'Segoe UI', sans-serif" font-size="46" font-weight="700" fill="#a0d8ef">ノーツレーダー</text>
+  <text x="694" y="228" font-family="'Segoe UI', sans-serif" font-size="34" font-weight="700" fill="#a0d8ef">可視化ツール</text>
   <!-- Divider -->
-  <line x1="662" y1="256" x2="1164" y2="256" stroke="#0f3460" stroke-width="1.5"/>
+  <line x1="694" y1="256" x2="1170" y2="256" stroke="#0f3460" stroke-width="1.5"/>
   <!-- Features -->
-  <text x="662" y="302" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・プレイ済みレーダー上位20曲を表示</text>
-  <text x="662" y="346" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・未プレイ曲のTOP10入り目標スコアを表示</text>
-  <text x="662" y="390" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・スコアCSV読み込みだけで自動算出</text>
-  <text x="662" y="434" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・X（旧Twitter）への画像シェアに対応</text>
+  <text x="694" y="302" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・プレイ済みレーダー上位20曲を表示</text>
+  <text x="694" y="346" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・未プレイ曲のTOP10入り目標スコアを表示</text>
+  <text x="694" y="390" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・スコアCSV読み込みだけで自動算出</text>
+  <text x="694" y="434" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・X（旧Twitter）への画像シェアに対応</text>
   <!-- URL -->
-  <text x="662" y="562" font-family="'Segoe UI', sans-serif" font-size="20" fill="#4a5568">notes-radar-visualization.netlify.app</text>
+  <text x="694" y="562" font-family="'Segoe UI', sans-serif" font-size="20" fill="#4a5568">notes-radar-visualization.netlify.app</text>
 </svg>
