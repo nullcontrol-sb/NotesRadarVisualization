@@ -1854,8 +1854,16 @@
         const blob = await generateShareImage();
         const values = computeRadarValues();
         const total  = RADAR_TYPES.reduce((s, t) => s + values[t], 0);
-        const parts  = RADAR_TYPES.map(t => `${t}:${values[t].toFixed(2)}`).join(' ');
-        const tweetText = `IIDXノーツレーダー\n${parts}\n合計:${total.toFixed(2)}\n#beatmaniaIIDX\nhttps://notes-radar-visualization.netlify.app/`;
+        const tags   = '#NotesRadarVisualization #IIDX #ノーツレーダー\nhttps://notes-radar-visualization.netlify.app/';
+        let tweetText;
+        if (prevRadarValues !== null) {
+          const prevTotal = RADAR_TYPES.reduce((s, t) => s + prevRadarValues[t], 0);
+          const totalDiff = total - prevTotal;
+          const diffStr   = (totalDiff >= 0 ? '+' : '') + totalDiff.toFixed(2);
+          tweetText = `ノーツレーダーが${diffStr}伸びました！\n\n${tags}`;
+        } else {
+          tweetText = `今のノーツレーダーはこれ！\n\n${tags}`;
+        }
         const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
         const file = new File([blob], 'iidx-notes-radar.png', { type: 'image/png' });
 
