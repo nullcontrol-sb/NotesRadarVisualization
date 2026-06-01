@@ -1632,7 +1632,7 @@
     }
 
     // ── シェア画像生成 ────────────────────────
-    function buildRadarSvgString(values) {
+    function buildRadarSvgString(values, prevValues) {
       const cx = 170, cy = 155, r = 95, labelR = 122;
       const pt = (type, radius) => {
         const a = CHART_ANGLE[type];
@@ -1648,6 +1648,18 @@
       for (const type of RADAR_TYPES) {
         const [x, y] = pt(type, r);
         s += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#1e3a6e" stroke-width="1"/>`;
+      }
+      if (prevValues) {
+        const prevPts = sortedTypes.map(t => {
+          const ratio = Math.min(prevValues[t] / CHART_MAX, 1);
+          return pt(t, r * ratio).map(v => v.toFixed(1)).join(',');
+        }).join(' ');
+        s += `<polygon points="${prevPts}" fill="rgba(104,211,145,0.08)" stroke="#4a7a5a" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+        for (const type of RADAR_TYPES) {
+          const ratio = Math.min(prevValues[type] / CHART_MAX, 1);
+          const [x, y] = pt(type, r * ratio);
+          s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="#4a7a5a" stroke="#1a1a2e" stroke-width="1"/>`;
+        }
       }
       const dataPts = sortedTypes.map(t => {
         const ratio = Math.min(values[t] / CHART_MAX, 1);
@@ -1686,7 +1698,8 @@
       ctx.textAlign = 'left';
       ctx.fillText('beatmania IIDX ノーツレーダースコア', 16, 18);
 
-      const svgStr = buildRadarSvgString(values);
+      const hasDiff = prevRadarValues !== null;
+      const svgStr = buildRadarSvgString(values, hasDiff ? prevRadarValues : null);
       await new Promise((resolve, reject) => {
         const img = new Image();
         const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
@@ -1705,9 +1718,19 @@
         ctx.font = 'bold 13px "Segoe UI", sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(type, panelX, y);
+        const currStr = values[type].toFixed(2);
+        const currWidth = hasDiff ? ctx.measureText(currStr).width : 0;
         ctx.fillStyle = '#e2e8f0';
         ctx.textAlign = 'right';
-        ctx.fillText(values[type].toFixed(2), W - 20, y);
+        ctx.fillText(currStr, W - 20, y);
+        if (hasDiff) {
+          const diff = values[type] - prevRadarValues[type];
+          const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(2);
+          const diffColor = diff > 0 ? '#68d391' : diff < 0 ? '#fc8181' : '#718096';
+          ctx.fillStyle = diffColor;
+          ctx.font = '11px "Segoe UI", sans-serif';
+          ctx.fillText(`(${diffStr})`, W - 20 - currWidth - 6, y);
+        }
         y += 32;
       }
       ctx.strokeStyle = '#0f3460';
@@ -1721,10 +1744,21 @@
       ctx.font = 'bold 12px "Segoe UI", sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText('合計レーダースコア', panelX, y);
+      const totalStr = total.toFixed(2);
+      const totalWidth = hasDiff ? (() => { ctx.font = 'bold 16px "Segoe UI", sans-serif'; return ctx.measureText(totalStr).width; })() : 0;
       ctx.fillStyle = '#a0d8ef';
       ctx.font = 'bold 16px "Segoe UI", sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(total.toFixed(2), W - 20, y);
+      ctx.fillText(totalStr, W - 20, y);
+      if (hasDiff) {
+        const prevTotal = RADAR_TYPES.reduce((s, t) => s + prevRadarValues[t], 0);
+        const totalDiff = total - prevTotal;
+        const totalDiffStr = (totalDiff >= 0 ? '+' : '') + totalDiff.toFixed(2);
+        const totalDiffColor = totalDiff > 0 ? '#68d391' : totalDiff < 0 ? '#fc8181' : '#718096';
+        ctx.fillStyle = totalDiffColor;
+        ctx.font = '12px "Segoe UI", sans-serif';
+        ctx.fillText(`(${totalDiffStr})`, W - 20 - totalWidth - 6, y);
+      }
       ctx.fillStyle = '#4a5568';
       ctx.font = '11px "Segoe UI", sans-serif';
       ctx.fillText('notes-radar-visualization.netlify.app', W - 20, H - 12);
