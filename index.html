@@ -613,6 +613,34 @@
     .chart-val-total { border-top: 1px solid #0f3460; margin-top: 6px; padding-top: 8px; }
     .chart-val-total .chart-val-label { color: #a0aec0; }
     .chart-val-total .chart-val-num { color: #a0d8ef; font-size: 14px; }
+
+    .share-bar {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .share-btn {
+      padding: 9px 28px;
+      background: #16213e;
+      border: 1px solid #4a5568;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .share-btn:hover { background: #1e2a4a; border-color: #a0aec0; }
+    .share-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .share-notice {
+      font-size: 12px;
+      color: #a0aec0;
+      min-height: 18px;
+      text-align: center;
+      line-height: 1.6;
+    }
   </style>
 </head>
 <body>
@@ -666,6 +694,10 @@
         <svg id="radar-svg" viewBox="0 0 340 305"></svg>
         <div id="chart-values" class="chart-values"></div>
       </div>
+    </div>
+    <div class="share-bar" id="share-bar">
+      <button class="share-btn" id="btn-share-twitter">𝕏 でポスト</button>
+      <div class="share-notice" id="share-notice"></div>
     </div>
   </div>
 
@@ -1599,6 +1631,107 @@
       document.getElementById('chart-section').classList.remove('hidden');
     }
 
+    // ── シェア画像生成 ────────────────────────
+    function buildRadarSvgString(values) {
+      const cx = 170, cy = 155, r = 95, labelR = 122;
+      const pt = (type, radius) => {
+        const a = CHART_ANGLE[type];
+        return [cx + radius * Math.cos(a), cy + radius * Math.sin(a)];
+      };
+      const sortedTypes = [...RADAR_TYPES].sort((a, b) => CHART_ANGLE[a] - CHART_ANGLE[b]);
+      let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 305" width="300" height="268"><rect width="340" height="305" fill="#1a1a2e"/>`;
+      for (let i = 1; i <= 5; i++) {
+        const gr = r * i / 5;
+        const pts = sortedTypes.map(t => pt(t, gr).map(v => v.toFixed(1)).join(',')).join(' ');
+        s += `<polygon points="${pts}" fill="${i === 5 ? 'rgba(15,52,96,0.3)' : 'none'}" stroke="#1e3a6e" stroke-width="1"/>`;
+      }
+      for (const type of RADAR_TYPES) {
+        const [x, y] = pt(type, r);
+        s += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#1e3a6e" stroke-width="1"/>`;
+      }
+      const dataPts = sortedTypes.map(t => {
+        const ratio = Math.min(values[t] / CHART_MAX, 1);
+        return pt(t, r * ratio).map(v => v.toFixed(1)).join(',');
+      }).join(' ');
+      s += `<polygon points="${dataPts}" fill="rgba(104,211,145,0.35)" stroke="#68d391" stroke-width="2"/>`;
+      for (const type of RADAR_TYPES) {
+        const ratio = Math.min(values[type] / CHART_MAX, 1);
+        const [x, y] = pt(type, r * ratio);
+        s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${RADAR_COLORS[type]}" stroke="#1a1a2e" stroke-width="1"/>`;
+      }
+      for (const type of RADAR_TYPES) {
+        const [x, y] = pt(type, labelR);
+        const cosA = Math.cos(CHART_ANGLE[type]);
+        const anchor = cosA > 0.3 ? 'start' : cosA < -0.3 ? 'end' : 'middle';
+        s += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="${RADAR_COLORS[type]}" font-size="11" font-weight="700" font-family="'Segoe UI',sans-serif">${type}</text>`;
+      }
+      s += '</svg>';
+      return s;
+    }
+
+    async function generateShareImage() {
+      const values = computeRadarValues();
+      const W = 640, H = 340;
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#0f3460';
+      ctx.fillRect(0, 0, W, 36);
+      ctx.fillStyle = '#a0d8ef';
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.fillText('beatmania IIDX ノーツレーダースコア', 16, 18);
+
+      const svgStr = buildRadarSvgString(values);
+      await new Promise((resolve, reject) => {
+        const img = new Image();
+        const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        img.onload = () => { ctx.drawImage(img, 10, 44, 300, 268); URL.revokeObjectURL(url); resolve(); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('SVG render failed')); };
+        img.src = url;
+      });
+
+      const total = RADAR_TYPES.reduce((s, t) => s + values[t], 0);
+      const panelX = 330;
+      let y = 100;
+      ctx.textBaseline = 'alphabetic';
+      for (const type of RADAR_TYPES) {
+        ctx.fillStyle = RADAR_COLORS[type];
+        ctx.font = 'bold 13px "Segoe UI", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(type, panelX, y);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.textAlign = 'right';
+        ctx.fillText(values[type].toFixed(2), W - 20, y);
+        y += 32;
+      }
+      ctx.strokeStyle = '#0f3460';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(panelX, y + 4);
+      ctx.lineTo(W - 20, y + 4);
+      ctx.stroke();
+      y += 22;
+      ctx.fillStyle = '#a0aec0';
+      ctx.font = 'bold 12px "Segoe UI", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('合計レーダースコア', panelX, y);
+      ctx.fillStyle = '#a0d8ef';
+      ctx.font = 'bold 16px "Segoe UI", sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(total.toFixed(2), W - 20, y);
+      ctx.fillStyle = '#4a5568';
+      ctx.font = '11px "Segoe UI", sans-serif';
+      ctx.fillText('notes-radar-visualization.netlify.app', W - 20, H - 12);
+
+      return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    }
+
     // ── 行選択（タップ/クリックでトグル・localStorage永続化）────────────────
     const SELECTED_KEY = 'nrv_selected_rows';
     let selectedRows = new Set(JSON.parse(localStorage.getItem(SELECTED_KEY) || '[]'));
@@ -1675,6 +1808,56 @@
     chartHeader.addEventListener('click', () => {
       chartCard.classList.toggle('closed');
       localStorage.setItem(CHART_COLLAPSED_KEY, chartCard.classList.contains('closed') ? '1' : '0');
+    });
+
+    // ── 𝕏 シェアボタン ────────────────────────
+    document.getElementById('btn-share-twitter').addEventListener('click', async () => {
+      const noticeEl = document.getElementById('share-notice');
+      const btn = document.getElementById('btn-share-twitter');
+      btn.disabled = true;
+      noticeEl.textContent = '画像を生成中…';
+      try {
+        const blob = await generateShareImage();
+        const values = computeRadarValues();
+        const total  = RADAR_TYPES.reduce((s, t) => s + values[t], 0);
+        const parts  = RADAR_TYPES.map(t => `${t}:${values[t].toFixed(2)}`).join(' ');
+        const tweetText = `IIDXノーツレーダー\n${parts}\n合計:${total.toFixed(2)}\n#beatmaniaIIDX\nhttps://notes-radar-visualization.netlify.app/`;
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+        const file = new File([blob], 'iidx-notes-radar.png', { type: 'image/png' });
+
+        // ① Web Share API（スマホ・対応デスクトップ）
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], text: tweetText });
+            noticeEl.textContent = '';
+            return;
+          } catch (e) {
+            if (e.name === 'AbortError') { noticeEl.textContent = ''; return; }
+            // フォールバックへ
+          }
+        }
+
+        // ② クリップボードコピー ＋ Twitter Intent
+        let copied = false;
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': Promise.resolve(blob) })]);
+          copied = true;
+        } catch {
+          const dlUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = dlUrl; a.download = 'iidx-notes-radar.png'; a.click();
+          setTimeout(() => URL.revokeObjectURL(dlUrl), 2000);
+        }
+        window.open(twitterUrl, '_blank', 'noopener');
+        noticeEl.textContent = copied
+          ? '画像をクリップボードにコピーしました。投稿画面で Ctrl+V（またはペースト）で添付できます。'
+          : '画像をダウンロードしました。投稿画面に画像を添付してください。';
+        setTimeout(() => { noticeEl.textContent = ''; }, 10000);
+      } catch {
+        noticeEl.textContent = '画像の生成に失敗しました。';
+      } finally {
+        btn.disabled = false;
+      }
     });
 
     // キャッシュからスコアデータを復元
