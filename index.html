@@ -1855,13 +1855,15 @@
         const values = computeRadarValues();
         const total  = RADAR_TYPES.reduce((s, t) => s + values[t], 0);
         const tags   = '#NotesRadarVisualization #IIDX #ノーツレーダー\nhttps://notes-radar-visualization.netlify.app/';
+        const now    = new Date();
+        const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
         let tweetText;
         if (prevRadarValues !== null) {
           const prevTotal = RADAR_TYPES.reduce((s, t) => s + prevRadarValues[t], 0);
           const totalDiff = total - prevTotal;
-          tweetText = `ノーツレーダーが${totalDiff.toFixed(2)}伸びました！\n\n${tags}`;
+          tweetText = `${dateStr}のノーツレーダーはこれ！\nノーツレーダーが${totalDiff.toFixed(2)}伸びました！\n\n${tags}`;
         } else {
-          tweetText = `今のノーツレーダーはこれ！\n\n${tags}`;
+          tweetText = `${dateStr}のノーツレーダーはこれ！\n\n${tags}`;
         }
         const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
         const file = new File([blob], 'iidx-notes-radar.png', { type: 'image/png' });
