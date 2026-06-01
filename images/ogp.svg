@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#1a1a2e"/>
+  <!-- Header bar -->
+  <rect width="1200" height="72" fill="#0f3460"/>
+  <text x="24" y="36" font-family="'Segoe UI', sans-serif" font-size="26" font-weight="700" fill="#a0d8ef" dominant-baseline="middle">beatmania IIDX ノーツレーダー可視化ツール</text>
+
+  <!-- ── Radar Chart (center: 350,345 / r=200) ── -->
+  <!-- Grid 20% -->
+  <polygon points="350,305 384.6,325 384.6,365 350,385 315.4,365 315.4,325" fill="none" stroke="#1e3a6e" stroke-width="1"/>
+  <!-- Grid 40% -->
+  <polygon points="350,265 419.3,305 419.3,385 350,425 280.7,385 280.7,305" fill="none" stroke="#1e3a6e" stroke-width="1"/>
+  <!-- Grid 60% -->
+  <polygon points="350,225 453.9,285 453.9,405 350,465 246.1,405 246.1,285" fill="none" stroke="#1e3a6e" stroke-width="1"/>
+  <!-- Grid 80% -->
+  <polygon points="350,185 488.6,265 488.6,425 350,505 211.4,425 211.4,265" fill="none" stroke="#1e3a6e" stroke-width="1"/>
+  <!-- Grid 100% -->
+  <polygon points="350,145 523.2,245 523.2,445 350,545 176.8,445 176.8,245" fill="rgba(15,52,96,0.3)" stroke="#1e3a6e" stroke-width="1"/>
+  <!-- Axes -->
+  <line x1="350" y1="345" x2="350"   y2="145" stroke="#1e3a6e" stroke-width="1"/>
+  <line x1="350" y1="345" x2="523.2" y2="245" stroke="#1e3a6e" stroke-width="1"/>
+  <line x1="350" y1="345" x2="523.2" y2="445" stroke="#1e3a6e" stroke-width="1"/>
+  <line x1="350" y1="345" x2="350"   y2="545" stroke="#1e3a6e" stroke-width="1"/>
+  <line x1="350" y1="345" x2="176.8" y2="445" stroke="#1e3a6e" stroke-width="1"/>
+  <line x1="350" y1="345" x2="176.8" y2="245" stroke="#1e3a6e" stroke-width="1"/>
+  <!-- Data polygon (NOTES, PEAK, SCRATCH, SOF-LAN, CHARGE, CHORD) -->
+  <polygon points="350,183 496.4,260.5 480.8,420.5 350,506 201.9,430.5 195.9,256" fill="rgba(104,211,145,0.35)" stroke="#68d391" stroke-width="2.5"/>
+  <!-- Data dots -->
+  <circle cx="350"   cy="183"   r="5.5" fill="#f687b3" stroke="#1a1a2e" stroke-width="1.5"/>
+  <circle cx="496.4" cy="260.5" r="5.5" fill="#fb923c" stroke="#1a1a2e" stroke-width="1.5"/>
+  <circle cx="480.8" cy="420.5" r="5.5" fill="#fc8181" stroke="#1a1a2e" stroke-width="1.5"/>
+  <circle cx="350"   cy="506"   r="5.5" fill="#76e4f7" stroke="#1a1a2e" stroke-width="1.5"/>
+  <circle cx="201.9" cy="430.5" r="5.5" fill="#b794f4" stroke="#1a1a2e" stroke-width="1.5"/>
+  <circle cx="195.9" cy="256"   r="5.5" fill="#86efac" stroke="#1a1a2e" stroke-width="1.5"/>
+  <!-- Axis labels -->
+  <text x="350"   y="113"   text-anchor="middle" dominant-baseline="middle" font-family="'Segoe UI', sans-serif" font-size="18" font-weight="700" fill="#f687b3">NOTES</text>
+  <text x="552"   y="229"   text-anchor="start"  dominant-baseline="middle" font-family="'Segoe UI', sans-serif" font-size="18" font-weight="700" fill="#fb923c">PEAK</text>
+  <text x="552"   y="461"   text-anchor="start"  dominant-baseline="middle" font-family="'Segoe UI', sans-serif" font-size="18" font-weight="700" fill="#fc8181">SCRATCH</text>
+  <text x="350"   y="577"   text-anchor="middle" dominant-baseline="middle" font-family="'Segoe UI', sans-serif" font-size="18" font-weight="700" fill="#76e4f7">SOF-LAN</text>
+  <text x="148"   y="461"   text-anchor="end"    dominant-baseline="middle" font-family="'Segoe UI', sans-serif" font-size="18" font-weight="700" fill="#b794f4">CHARGE</text>
+  <text x="148"   y="229"   text-anchor="end"    dominant-baseline="middle" font-family="'Segoe UI', sans-serif" font-size="18" font-weight="700" fill="#86efac">CHORD</text>
+
+  <!-- ── Right Side ── -->
+  <line x1="660" y1="92" x2="660" y2="578" stroke="#0f3460" stroke-width="2"/>
+  <!-- Title -->
+  <text x="694" y="175" font-family="'Segoe UI', sans-serif" font-size="46" font-weight="700" fill="#a0d8ef">ノーツレーダー</text>
+  <text x="694" y="228" font-family="'Segoe UI', sans-serif" font-size="34" font-weight="700" fill="#a0d8ef">可視化ツール</text>
+  <!-- Divider -->
+  <line x1="694" y1="256" x2="1170" y2="256" stroke="#0f3460" stroke-width="1.5"/>
+  <!-- Features -->
+  <text x="694" y="302" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・プレイ済みレーダー上位20曲を表示</text>
+  <text x="694" y="346" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・未プレイ曲のTOP10入り目標スコアを表示</text>
+  <text x="694" y="390" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・スコアCSV読み込みだけで自動算出</text>
+  <text x="694" y="434" font-family="'Segoe UI', sans-serif" font-size="22" fill="#e2e8f0">・X（旧Twitter）への画像シェアに対応</text>
+  <!-- URL -->
+  <text x="694" y="562" font-family="'Segoe UI', sans-serif" font-size="20" fill="#4a5568">notes-radar-visualization.netlify.app</text>
+</svg>
