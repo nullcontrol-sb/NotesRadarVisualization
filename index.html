@@ -1625,7 +1625,6 @@
         document.getElementById('tbody').innerHTML =
           `<tr><td colspan="${colSpan}" style="text-align:center;color:#a0aec0;padding:40px 16px;">${msg}</td></tr>`;
         document.getElementById('info-text').textContent = '過去作比較';
-        applySelectedRows();
       }
 
       if (!oldScoreRows) { showPlaceholder('上の「旧バージョン CSVインポート」から旧スコアを読み込んでください'); return; }
@@ -1707,15 +1706,18 @@
 
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = top20.map((e, i) => {
-        const isImproved = e.scoreDiff !== null && e.scoreDiff > 0;
+        const isImproved = e.scoreDiff !== null && e.scoreDiff >= 0;
         const noNew = e.newScore === null;
         const rowClass = isImproved ? 'comparison-improved' : (noNew ? 'out-of-top10' : '');
 
         const oldRadarStr = (Math.floor(e.oldRadarValue * 100) / 100).toFixed(2);
 
-        const scoreDiffHtml = (e.scoreDiff !== null && e.scoreDiff !== 0)
-          ? `<span style="color:${e.scoreDiff > 0 ? '#68d391' : '#fc8181'};font-size:11px;"> (${e.scoreDiff > 0 ? '+' : ''}${e.scoreDiff.toLocaleString()})</span>`
-          : '';
+        let scoreDiffHtml = '';
+        if (e.scoreDiff !== null) {
+          if (e.scoreDiff > 0)      scoreDiffHtml = `<span style="color:#68d391;font-size:11px;"> (+${e.scoreDiff.toLocaleString()})</span>`;
+          else if (e.scoreDiff < 0) scoreDiffHtml = `<span style="color:#fc8181;font-size:11px;"> (${e.scoreDiff.toLocaleString()})</span>`;
+          else                      scoreDiffHtml = `<span style="color:#718096;font-size:11px;"> (±0)</span>`;
+        }
 
         const newScoreCell = noNew
           ? `<span class="comp-no-new">—</span>`
@@ -1725,7 +1727,7 @@
           ? `<span class="comp-no-new">—</span>`
           : `<span class="${isImproved ? 'comp-score-improved' : ''}">${(Math.floor(e.newRadarValue * 100) / 100).toFixed(2)}</span>`;
 
-        return `<tr class="${rowClass}" data-row-key="${escHtml(e.title + '::' + e.diffAbbr)}">
+        return `<tr class="${rowClass}">
           <td class="rank center">${i + 1}</td>
           <td class="title" title="${escHtml(displayTitle(e.title))}">${escHtml(displayTitle(e.title))}</td>
           <td class="center"><span class="badge badge-${e.diffAbbr}"><span class="diff-full">${e.diffFull}</span><span class="diff-abbr">${e.diffAbbr}</span></span></td>
@@ -1736,7 +1738,6 @@
           <td class="radar">${newRadarCell}</td>
         </tr>`;
       }).join('');
-      applySelectedRows();
     }
 
     // ── レーダーチャート描画 ──────────────────
@@ -2066,6 +2067,7 @@
     });
 
     document.getElementById('tbody').addEventListener('click', e => {
+      if (viewMode === 'comparison') return;
       const tr = e.target.closest('tr[data-row-key]');
       if (!tr) return;
       const key = tr.dataset.rowKey;
