@@ -1683,10 +1683,18 @@
       }
       const top20 = [...repMap.values()].slice(0, 20);
 
-      const reached  = top20.filter(e => e.scoreDiff !== null && e.scoreDiff >= 0).length;
-      const improved = top20.filter(e => e.scoreDiff !== null && e.scoreDiff > 0).length;
-      document.getElementById('info-text').textContent =
-        `${activeTab} — 旧スコア上位 20 件（新スコア到達：${reached} 件 / うち更新：${improved} 件）`;
+      const cnt = Math.min(top20.length, 10);
+      const oldTotal = cnt > 0
+        ? Math.floor(top20.slice(0, cnt).reduce((s, e) => s + Math.floor(e.oldRadarValue * 100) / 100, 0) / cnt * 100) / 100
+        : 0;
+      const newTotal = cnt > 0
+        ? Math.floor(top20.slice(0, cnt).reduce((s, e) => s + Math.floor((e.newRadarValue ?? 0) * 100) / 100, 0) / cnt * 100) / 100
+        : 0;
+      const totalDiff = Math.floor((newTotal - oldTotal) * 100) / 100;
+      document.getElementById('info-text').textContent = `${activeTab} — 旧スコア上位 20 件`;
+      const avgEl = document.getElementById('avg-value');
+      avgEl.style.display = '';
+      avgEl.textContent = `旧：${oldTotal.toFixed(2)}　新：${newTotal.toFixed(2)}　(${totalDiff >= 0 ? '+' : ''}${totalDiff.toFixed(2)})`;
 
       document.getElementById('thead').innerHTML = `<tr>
         <th style="width:40px">#</th>
