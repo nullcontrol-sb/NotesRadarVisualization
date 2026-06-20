@@ -1391,18 +1391,6 @@
       return `<span style="color:${color};font-size:11px;"> (${diff > 0 ? '+' : ''}${diff.toLocaleString()})</span>`;
     }
 
-    // ── ノーツ数→maxEx逆引き ─────────────────
-    function getMaxEx(rawTitle, diffAbbr) {
-      for (const type of RADAR_TYPES) {
-        const maps = radarMapByType[type];
-        if (!maps) continue;
-        const e = maps.strict.get(`${titleKeyStrict(rawTitle)}::${diffAbbr}`)
-               || maps.loose.get(`${titleKeyForDedup(rawTitle)}::${diffAbbr}`);
-        if (e && e.notes > 0) return e.notes * 2;
-      }
-      return null;
-    }
-
     // ── 描画 ─────────────────────────────────
     function renderCurrentTab() {
       if (viewMode === 'unplayed')    { renderUnplayedTab();    return; }
@@ -1631,16 +1619,21 @@
     function renderComparisonTab() {
       document.getElementById('avg-value').style.display = 'none';
 
-      if (!oldScoreRows) {
+      const colSpan = 8;
+      function showPlaceholder(msg) {
         document.getElementById('thead').innerHTML = '';
         document.getElementById('tbody').innerHTML =
-          '<tr><td colspan="7" style="text-align:center;color:#a0aec0;padding:40px 16px;">上の「旧バージョン CSVインポート」から旧スコアを読み込んでください</td></tr>';
+          `<tr><td colspan="${colSpan}" style="text-align:center;color:#a0aec0;padding:40px 16px;">${msg}</td></tr>`;
         document.getElementById('info-text').textContent = '過去作比較';
         applySelectedRows();
-        return;
       }
 
-      // 新CSVのスコアマップ構築
+      if (!oldScoreRows) { showPlaceholder('上の「旧バージョン CSVインポート」から旧スコアを読み込んでください'); return; }
+
+      const maps = radarMapByType[activeTab];
+      if (!maps) { showPlaceholder('レーダーデータを読み込み中…'); return; }
+
+      // 新スコアマップ構築
       const newScoreMap = new Map(); // titleKeyForDedup::diffAbbr → score
       if (scoreRows) {
         for (const row of scoreRows) {
@@ -1656,8 +1649,8 @@
         }
       }
 
-      // 旧CSVからエントリ構築
-      const entries = [];
+      // 旧CSVからエントリ構築（activeTabのレーダー値を計算）
+      const allEntries = [];
       for (const row of oldScoreRows) {
         const rawTitle = (row['タイトル'] || '').trim();
         if (!rawTitle) continue;
@@ -1666,36 +1659,46 @@
           if (!clearType || clearType === 'NO PLAY') continue;
           const oldScore = parseInt(row[`${d.full} スコア`]);
           if (isNaN(oldScore) || oldScore <= 0) continue;
+
+          const radar = maps.strict.get(`${titleKeyStrict(rawTitle)}::${d.abbr}`)
+                     || maps.loose.get(`${titleKeyForDedup(rawTitle)}::${d.abbr}`);
+          if (!radar || radar.notes <= 0) continue;
+
+          const maxEx = radar.notes * 2;
+          const oldRadarValue = (oldScore / maxEx) * radar.max;
           const level = (row[`${d.full} 難易度`] || supplementLevelMap.get(`${titleKeyForDedup(rawTitle)}::${d.abbr}`) || '').trim();
           const newScore = newScoreMap.get(`${titleKeyForDedup(rawTitle)}::${d.abbr}`) ?? null;
+          const newRadarValue = newScore !== null ? (newScore / maxEx) * radar.max : null;
           const scoreDiff = newScore !== null ? newScore - oldScore : null;
-          const maxEx = getMaxEx(rawTitle, d.abbr);
-          entries.push({ title: rawTitle, diffFull: d.full, diffAbbr: d.abbr, level, oldScore, newScore, scoreDiff, maxEx });
+
+          allEntries.push({ title: rawTitle, diffFull: d.full, diffAbbr: d.abbr, level,
+            oldScore, oldRadarValue, newScore, newRadarValue, scoreDiff, maxEx, radarMax: radar.max });
         }
       }
 
-      // 差分降順ソート（未プレイ＝null は末尾）
-      entries.sort((a, b) => {
-        const ad = a.scoreDiff ?? -Infinity;
-        const bd = b.scoreDiff ?? -Infinity;
-        return bd !== ad ? bd - ad : b.oldScore - a.oldScore;
-      });
+      // 旧レーダー値降順でタイトル重複排除 → 上位20件
+      allEntries.sort((a, b) => b.oldRadarValue - a.oldRadarValue);
+      const repMap = new Map();
+      for (const e of allEntries) {
+        if (!repMap.has(titleKeyForDedup(e.title))) repMap.set(titleKeyForDedup(e.title), e);
+      }
+      const top20 = [...repMap.values()].slice(0, 20);
 
-      const improved = entries.filter(e => e.scoreDiff !== null && e.scoreDiff > 0).length;
+      const improved = top20.filter(e => e.scoreDiff !== null && e.scoreDiff > 0).length;
       document.getElementById('info-text').textContent =
-        `過去作比較 — ${entries.length}件中 ${improved}件スコア更新`;
+        `${activeTab} — 旧スコア上位 20 件（うち ${improved} 件スコア更新）`;
 
       document.getElementById('thead').innerHTML = `<tr>
         <th style="width:40px">#</th>
         <th class="left">タイトル</th>
         <th>難易度</th><th>☆</th>
         <th>旧EXスコア</th>
+        <th>旧レーダー値</th>
         <th>新EXスコア</th>
-        <th>差分</th>
+        <th>新レーダー値</th>
       </tr>`;
 
       function djHtml(score, maxEx) {
-        if (!maxEx) return '';
         const { nearestName, diff } = getDJLevelInfo(score, maxEx);
         const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
         const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
@@ -1703,36 +1706,34 @@
       }
 
       const tbody = document.getElementById('tbody');
-      tbody.innerHTML = entries.map((e, i) => {
-        const isImproved  = e.scoreDiff !== null && e.scoreDiff > 0;
-        const isRegressed = e.scoreDiff !== null && e.scoreDiff < 0;
+      tbody.innerHTML = top20.map((e, i) => {
+        const isImproved = e.scoreDiff !== null && e.scoreDiff > 0;
         const noNew = e.newScore === null;
         const rowClass = isImproved ? 'comparison-improved' : (noNew ? 'out-of-top10' : '');
 
-        const oldScoreHtml = `${e.oldScore.toLocaleString()}${djHtml(e.oldScore, e.maxEx)}`;
+        const oldRadarStr = (Math.floor(e.oldRadarValue * 100) / 100).toFixed(2);
 
-        const newScoreHtml = noNew
+        const scoreDiffHtml = (e.scoreDiff !== null && e.scoreDiff !== 0)
+          ? `<span style="color:${e.scoreDiff > 0 ? '#68d391' : '#fc8181'};font-size:11px;"> (${e.scoreDiff > 0 ? '+' : ''}${e.scoreDiff.toLocaleString()})</span>`
+          : '';
+
+        const newScoreCell = noNew
           ? `<span class="comp-no-new">—</span>`
-          : `<span class="${isImproved ? 'comp-score-improved' : ''}">${e.newScore.toLocaleString()}${djHtml(e.newScore, e.maxEx)}</span>`;
+          : `<span class="${isImproved ? 'comp-score-improved' : ''}">${e.newScore.toLocaleString()}${scoreDiffHtml}${djHtml(e.newScore, e.maxEx)}</span>`;
 
-        let diffHtml;
-        if (e.scoreDiff === null) {
-          diffHtml = `<span class="comp-no-new">—</span>`;
-        } else if (e.scoreDiff === 0) {
-          diffHtml = `<span class="comp-diff-zero">±0</span>`;
-        } else {
-          const cls = isImproved ? 'comp-diff-positive' : 'comp-diff-negative';
-          diffHtml = `<span class="${cls}">${e.scoreDiff > 0 ? '+' : ''}${e.scoreDiff.toLocaleString()}</span>`;
-        }
+        const newRadarCell = e.newRadarValue === null
+          ? `<span class="comp-no-new">—</span>`
+          : `<span class="${isImproved ? 'comp-score-improved' : ''}">${(Math.floor(e.newRadarValue * 100) / 100).toFixed(2)}</span>`;
 
         return `<tr class="${rowClass}" data-row-key="${escHtml(e.title + '::' + e.diffAbbr)}">
           <td class="rank center">${i + 1}</td>
           <td class="title" title="${escHtml(displayTitle(e.title))}">${escHtml(displayTitle(e.title))}</td>
           <td class="center"><span class="badge badge-${e.diffAbbr}"><span class="diff-full">${e.diffFull}</span><span class="diff-abbr">${e.diffAbbr}</span></span></td>
           <td class="center">${(e.level && e.level !== '0') ? '☆' + e.level : '—'}</td>
-          <td class="right">${oldScoreHtml}</td>
-          <td class="right">${newScoreHtml}</td>
-          <td class="right">${diffHtml}</td>
+          <td class="right">${e.oldScore.toLocaleString()}${djHtml(e.oldScore, e.maxEx)}</td>
+          <td class="radar">${oldRadarStr}</td>
+          <td class="right">${newScoreCell}</td>
+          <td class="radar">${newRadarCell}</td>
         </tr>`;
       }).join('');
       applySelectedRows();
