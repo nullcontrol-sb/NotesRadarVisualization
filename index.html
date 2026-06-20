@@ -1683,9 +1683,10 @@
       }
       const top20 = [...repMap.values()].slice(0, 20);
 
+      const reached  = top20.filter(e => e.scoreDiff !== null && e.scoreDiff >= 0).length;
       const improved = top20.filter(e => e.scoreDiff !== null && e.scoreDiff > 0).length;
       document.getElementById('info-text').textContent =
-        `${activeTab} — 旧スコア上位 20 件（うち ${improved} 件スコア更新）`;
+        `${activeTab} — 旧スコア上位 20 件（新スコア到達：${reached} 件 / うち更新：${improved} 件）`;
 
       document.getElementById('thead').innerHTML = `<tr>
         <th style="width:40px">#</th>
