@@ -1687,9 +1687,7 @@
       const oldTotal = cnt > 0
         ? Math.floor(top20.slice(0, cnt).reduce((s, e) => s + Math.floor(e.oldRadarValue * 100) / 100, 0) / cnt * 100) / 100
         : 0;
-      const newTotal = cnt > 0
-        ? Math.floor(top20.slice(0, cnt).reduce((s, e) => s + Math.floor((e.newRadarValue ?? 0) * 100) / 100, 0) / cnt * 100) / 100
-        : 0;
+      const newTotal = computeRadarValues()[activeTab] ?? 0;
       const totalDiff = Math.floor((newTotal - oldTotal) * 100) / 100;
       document.getElementById('info-text').textContent = `${activeTab} — 旧スコア上位 20 件`;
       const avgEl = document.getElementById('avg-value');
