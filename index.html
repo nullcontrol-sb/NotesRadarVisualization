@@ -858,6 +858,7 @@
     let unplayedByType      = {};
     let scoreRows           = null;
     let prevRadarValues     = null; // インポート前のレーダー値（差分表示用）
+    let prevScoreMap        = null; // インポート前のスコアマップ（差分表示用） Map<"titleKeyForDedup::diffAbbr", score>
     let activeTab            = 'NOTES';
     let viewMode             = 'played'; // 'played' | 'unplayed'
     let unplayedLevelFilter  = '';       // 未プレイ ☆フィルタ値（''=すべて）
@@ -1016,6 +1017,21 @@
     function loadScoreText(text, label) {
       // 既にデータ算出済みの場合、インポート前の値を差分表示用に保存
       prevRadarValues = Object.keys(resultsByType).length > 0 ? computeRadarValues() : null;
+      if (scoreRows) {
+        const m = new Map();
+        for (const row of scoreRows) {
+          const rawTitle = (row['タイトル'] || '').trim();
+          if (!rawTitle) continue;
+          const tk = titleKeyForDedup(rawTitle);
+          for (const diff of DIFF_MAP) {
+            const score = parseInt(row[`${diff.full} スコア`]);
+            if (!isNaN(score) && score > 0) m.set(`${tk}::${diff.abbr}`, score);
+          }
+        }
+        prevScoreMap = m;
+      } else {
+        prevScoreMap = null;
+      }
       const { rows } = parseCSV(text);
       scoreRows = rows;
       localStorage.setItem('scoreCSV',     text);
@@ -1325,6 +1341,17 @@
       renderCurrentTab();
     }
 
+    // ── スコア差分HTML ───────────────────────
+    function makeScoreDiffHtml(r) {
+      if (!prevScoreMap) return '';
+      const prevScore = prevScoreMap.get(`${titleKeyForDedup(r.title)}::${r.diffAbbr}`);
+      if (prevScore === undefined) return '';
+      const diff = r.score - prevScore;
+      if (diff === 0) return '';
+      const color = diff > 0 ? '#68d391' : '#fc8181';
+      return `<span style="color:${color};font-size:11px;"> (${diff > 0 ? '+' : ''}${diff.toLocaleString()})</span>`;
+    }
+
     // ── 描画 ─────────────────────────────────
     function renderCurrentTab() {
       if (viewMode === 'unplayed') { renderUnplayedTab(); return; }
@@ -1394,7 +1421,7 @@
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
-          <td class="right">${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span></td>
+          <td class="right">${r.score.toLocaleString()}${makeScoreDiffHtml(r)}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span></td>
           <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
           <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}</td>
         </tr>`;
@@ -1417,7 +1444,7 @@
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
-          <td class="right">${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
+          <td class="right">${r.score.toLocaleString()}${makeScoreDiffHtml(r)}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
           <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
           <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
         </tr>`);
@@ -1440,7 +1467,7 @@
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
-          <td class="right">${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
+          <td class="right">${r.score.toLocaleString()}${makeScoreDiffHtml(r)}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
           <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
           <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
         </tr>`);
