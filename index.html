@@ -1391,6 +1391,18 @@
       return `<span style="color:${color};font-size:11px;"> (${diff > 0 ? '+' : ''}${diff.toLocaleString()})</span>`;
     }
 
+    function makeRadarDiffHtml(r) {
+      if (!prevScoreMap) return '';
+      const prevScore = prevScoreMap.get(`${titleKeyForDedup(r.title)}::${r.diffAbbr}`);
+      if (prevScore === undefined) return '';
+      const prevRadar = Math.floor((prevScore / r.maxEx) * r.radarMax * 100) / 100;
+      const currRadar = Math.floor(r.radarValue * 100) / 100;
+      const diff = Math.floor((currRadar - prevRadar) * 100) / 100;
+      if (diff === 0) return '';
+      const color = diff > 0 ? '#68d391' : '#fc8181';
+      return `<span style="color:${color};font-size:11px;"> (${diff > 0 ? '+' : ''}${diff.toFixed(2)})</span>`;
+    }
+
     // ── 描画 ─────────────────────────────────
     function renderCurrentTab() {
       if (viewMode === 'unplayed')    { renderUnplayedTab();    return; }
@@ -1463,7 +1475,7 @@
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
           <td class="right">${r.score.toLocaleString()}${makeScoreDiffHtml(r)}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span></td>
           <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
-          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}</td>
+          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${makeRadarDiffHtml(r)}</td>
         </tr>`;
       }
 
@@ -1486,7 +1498,7 @@
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
           <td class="right">${r.score.toLocaleString()}${makeScoreDiffHtml(r)}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
           <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
-          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
+          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${makeRadarDiffHtml(r)}${guidanceHtml}</td>
         </tr>`);
       });
       // 11位以降
@@ -1509,7 +1521,7 @@
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
           <td class="right">${r.score.toLocaleString()}${makeScoreDiffHtml(r)}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
           <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
-          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
+          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${makeRadarDiffHtml(r)}${guidanceHtml}</td>
         </tr>`);
       });
 
