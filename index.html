@@ -648,6 +648,17 @@
       text-align: center;
       line-height: 1.6;
     }
+
+    /* 過去作比較モード */
+    tbody tr.comparison-improved:nth-child(odd)  { background: #0d2218; }
+    tbody tr.comparison-improved:nth-child(even) { background: #0f2a1e; }
+    tbody tr.comparison-improved:hover { background: #133020 !important; }
+    tbody tr.comparison-improved td { color: #e2e8f0; }
+    .comp-score-improved { color: #68d391; font-weight: 700; }
+    .comp-diff-positive  { color: #68d391; font-weight: 700; }
+    .comp-diff-negative  { color: #fc8181; }
+    .comp-diff-zero      { color: #718096; }
+    .comp-no-new         { color: #4a5568; }
   </style>
 </head>
 <body>
@@ -676,6 +687,29 @@
           <button class="paste-load-btn" id="btn-paste-load">読み込む</button>
         </div>
         <div class="file-name" id="name-score"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="upload-section hidden" id="old-csv-section">
+    <div class="upload-card" id="card-old-score">
+      <div class="upload-header" id="old-upload-header">
+        <h3>旧バージョン CSVインポート</h3>
+        <span class="upload-chevron">▼</span>
+      </div>
+      <div class="upload-body">
+        <p style="font-size:12px;color:#a0aec0;margin-bottom:14px;text-align:left;">比較元となる旧バージョンのSPスコアCSVをインポートしてください</p>
+        <label for="input-old-score">CSVファイルを選択</label>
+        <input type="file" id="input-old-score" accept=".csv">
+        <div class="load-alt-btns">
+          <button class="load-alt-btn" id="btn-old-clipboard">クリップボードから読み込む</button>
+          <button class="load-alt-btn" id="btn-toggle-old-paste">テキストを貼り付け</button>
+        </div>
+        <div class="paste-area" id="old-paste-area">
+          <textarea id="old-paste-textarea" placeholder="CSVの内容をここに貼り付けてください…"></textarea>
+          <button class="paste-load-btn" id="btn-old-paste-load">読み込む</button>
+        </div>
+        <div class="file-name" id="name-old-score"></div>
       </div>
     </div>
   </div>
@@ -710,9 +744,10 @@
 
   <div class="result-section hidden" id="result-section">
     <div class="view-tab-bar">
-      <button class="view-tab-btn active" id="view-tab-played"   onclick="switchView('played')">プレイ済み上位</button>
-      <button class="view-tab-btn"        id="view-tab-unplayed" onclick="switchView('unplayed')">未プレイ上位</button>
-      <div class="options-wrapper">
+      <button class="view-tab-btn active" id="view-tab-played"     onclick="switchView('played')">プレイ済み上位</button>
+      <button class="view-tab-btn"        id="view-tab-unplayed"   onclick="switchView('unplayed')">未プレイ上位</button>
+      <button class="view-tab-btn"        id="view-tab-comparison" onclick="switchView('comparison')">過去作比較</button>
+      <div class="options-wrapper" id="options-wrapper">
         <button class="options-toggle-btn" id="options-toggle-btn">オプション ▾</button>
         <div class="options-panel" id="options-panel">
           <label class="hide-alts-label"><input type="checkbox" id="hide-alts-cb">ランクイン楽曲の別難易度を表示しない</label>
@@ -743,6 +778,10 @@
       <button class="modal-close" id="release-notes-close">✕</button>
       <div class="modal-section">
         <h3>■リリースノート</h3>
+      </div>
+      <div class="modal-section">
+        <h3>〇2026/06/21</h3>
+        <p>・スコア差分表示を追加<br>└前回読み込み時のデータがある場合、更新曲のEXスコア差分、レーダー値差分が表示されるようになりました。<br><br>・過去作比較機能を追加<br>└過去作のレーダー値と現行作のレーダー値を比較できる機能を追加しました。</p>
       </div>
       <div class="modal-section">
         <h3>〇2026/06/01</h3>
@@ -858,6 +897,8 @@
     let unplayedByType      = {};
     let scoreRows           = null;
     let prevRadarValues     = null; // インポート前のレーダー値（差分表示用）
+    let prevScoreMap        = null; // インポート前のスコアマップ（差分表示用） Map<"titleKeyForDedup::diffAbbr", score>
+    let oldScoreRows        = null; // 旧バージョンCSVのパース結果（過去作比較用）
     let activeTab            = 'NOTES';
     let viewMode             = 'played'; // 'played' | 'unplayed'
     let unplayedLevelFilter  = '';       // 未プレイ ☆フィルタ値（''=すべて）
@@ -1016,6 +1057,21 @@
     function loadScoreText(text, label) {
       // 既にデータ算出済みの場合、インポート前の値を差分表示用に保存
       prevRadarValues = Object.keys(resultsByType).length > 0 ? computeRadarValues() : null;
+      if (scoreRows) {
+        const m = new Map();
+        for (const row of scoreRows) {
+          const rawTitle = (row['タイトル'] || '').trim();
+          if (!rawTitle) continue;
+          const tk = titleKeyForDedup(rawTitle);
+          for (const diff of DIFF_MAP) {
+            const score = parseInt(row[`${diff.full} スコア`]);
+            if (!isNaN(score) && score > 0) m.set(`${tk}::${diff.abbr}`, score);
+          }
+        }
+        prevScoreMap = m;
+      } else {
+        prevScoreMap = null;
+      }
       const { rows } = parseCSV(text);
       scoreRows = rows;
       localStorage.setItem('scoreCSV',     text);
@@ -1320,14 +1376,41 @@
     // ── ビューモード切替 ─────────────────────
     function switchView(mode) {
       viewMode = mode;
-      document.getElementById('view-tab-played').classList.toggle('active',   mode === 'played');
-      document.getElementById('view-tab-unplayed').classList.toggle('active', mode === 'unplayed');
+      document.getElementById('view-tab-played').classList.toggle('active',     mode === 'played');
+      document.getElementById('view-tab-unplayed').classList.toggle('active',   mode === 'unplayed');
+      document.getElementById('view-tab-comparison').classList.toggle('active', mode === 'comparison');
+      document.getElementById('old-csv-section').classList.toggle('hidden',     mode !== 'comparison');
+      document.getElementById('options-wrapper').classList.toggle('hidden',     mode === 'comparison');
       renderCurrentTab();
+    }
+
+    // ── スコア差分HTML ───────────────────────
+    function makeScoreDiffHtml(r) {
+      if (!prevScoreMap) return '';
+      const prevScore = prevScoreMap.get(`${titleKeyForDedup(r.title)}::${r.diffAbbr}`);
+      if (prevScore === undefined) return '';
+      const diff = r.score - prevScore;
+      if (diff === 0) return '';
+      const color = diff > 0 ? '#68d391' : '#fc8181';
+      return `<span style="color:${color};font-size:11px;"> (${diff > 0 ? '+' : ''}${diff.toLocaleString()})</span>`;
+    }
+
+    function makeRadarDiffHtml(r) {
+      if (!prevScoreMap) return '';
+      const prevScore = prevScoreMap.get(`${titleKeyForDedup(r.title)}::${r.diffAbbr}`);
+      if (prevScore === undefined) return '';
+      const prevRadar = Math.floor((prevScore / r.maxEx) * r.radarMax * 100) / 100;
+      const currRadar = Math.floor(r.radarValue * 100) / 100;
+      const diff = Math.floor((currRadar - prevRadar) * 100) / 100;
+      if (diff === 0) return '';
+      const color = diff > 0 ? '#68d391' : '#fc8181';
+      return `<span style="color:${color};font-size:11px;"> (${diff > 0 ? '+' : ''}${diff.toFixed(2)})</span>`;
     }
 
     // ── 描画 ─────────────────────────────────
     function renderCurrentTab() {
-      if (viewMode === 'unplayed') { renderUnplayedTab(); return; }
+      if (viewMode === 'unplayed')    { renderUnplayedTab();    return; }
+      if (viewMode === 'comparison')  { renderComparisonTab();  return; }
 
       const results = resultsByType[activeTab];
       if (!results) return;
@@ -1394,9 +1477,9 @@
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
-          <td class="right">${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span></td>
+          <td class="right">${r.score.toLocaleString()}${makeScoreDiffHtml(r)}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span></td>
           <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
-          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}</td>
+          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${makeRadarDiffHtml(r)}</td>
         </tr>`;
       }
 
@@ -1417,9 +1500,9 @@
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
-          <td class="right">${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
+          <td class="right">${r.score.toLocaleString()}${makeScoreDiffHtml(r)}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
           <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
-          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
+          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${makeRadarDiffHtml(r)}${guidanceHtml}</td>
         </tr>`);
       });
       // 11位以降
@@ -1440,9 +1523,9 @@
           <td class="title" title="${escHtml(displayTitle(r.title))}">${escHtml(displayTitle(r.title))}</td>
           <td class="center"><span class="badge badge-${r.diffAbbr}"><span class="diff-full">${r.diffFull}</span><span class="diff-abbr">${r.diffAbbr}</span></span></td>
           <td class="center">${(r.level && r.level !== '0') ? '☆' + r.level : '—'}</td>
-          <td class="right">${r.score.toLocaleString()}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
+          <td class="right">${r.score.toLocaleString()}${makeScoreDiffHtml(r)}<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${djDiff})</span></td>
           <td class="right col-rate">${(r.rate * 100).toFixed(2)}%</td>
-          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${guidanceHtml}</td>
+          <td class="radar">${(Math.floor(r.radarValue * 100) / 100).toFixed(2)}${makeRadarDiffHtml(r)}${guidanceHtml}</td>
         </tr>`);
       });
 
@@ -1546,6 +1629,138 @@
 
       document.getElementById('info-text').textContent =
         `${activeTab} — 未プレイ上位 20 件表示`;
+    }
+
+    // ── 過去作比較描画 ───────────────────────
+    function renderComparisonTab() {
+      document.getElementById('avg-value').style.display = 'none';
+
+      const colSpan = 8;
+      function showPlaceholder(msg) {
+        document.getElementById('thead').innerHTML = '';
+        document.getElementById('tbody').innerHTML =
+          `<tr><td colspan="${colSpan}" style="text-align:center;color:#a0aec0;padding:40px 16px;">${msg}</td></tr>`;
+        document.getElementById('info-text').textContent = '過去作比較';
+      }
+
+      if (!oldScoreRows) { showPlaceholder('上の「旧バージョン CSVインポート」から旧スコアを読み込んでください'); return; }
+
+      const maps = radarMapByType[activeTab];
+      if (!maps) { showPlaceholder('レーダーデータを読み込み中…'); return; }
+
+      // 新スコアマップ構築
+      const newScoreMap = new Map(); // titleKeyForDedup::diffAbbr → score
+      if (scoreRows) {
+        for (const row of scoreRows) {
+          const rawTitle = (row['タイトル'] || '').trim();
+          if (!rawTitle) continue;
+          const tk = titleKeyForDedup(rawTitle);
+          for (const d of DIFF_MAP) {
+            const clearType = (row[`${d.full} クリアタイプ`] || '').trim();
+            const score = parseInt(row[`${d.full} スコア`]);
+            if (!clearType || clearType === 'NO PLAY' || isNaN(score) || score <= 0) continue;
+            newScoreMap.set(`${tk}::${d.abbr}`, score);
+          }
+        }
+      }
+
+      // 旧CSVからエントリ構築（activeTabのレーダー値を計算）
+      const allEntries = [];
+      for (const row of oldScoreRows) {
+        const rawTitle = (row['タイトル'] || '').trim();
+        if (!rawTitle) continue;
+        for (const d of DIFF_MAP) {
+          const clearType = (row[`${d.full} クリアタイプ`] || '').trim();
+          if (!clearType || clearType === 'NO PLAY') continue;
+          const oldScore = parseInt(row[`${d.full} スコア`]);
+          if (isNaN(oldScore) || oldScore <= 0) continue;
+
+          const radar = maps.strict.get(`${titleKeyStrict(rawTitle)}::${d.abbr}`)
+                     || maps.loose.get(`${titleKeyForDedup(rawTitle)}::${d.abbr}`);
+          if (!radar || radar.notes <= 0) continue;
+
+          const maxEx = radar.notes * 2;
+          const oldRadarValue = (oldScore / maxEx) * radar.max;
+          const level = (row[`${d.full} 難易度`] || supplementLevelMap.get(`${titleKeyForDedup(rawTitle)}::${d.abbr}`) || '').trim();
+          const newScore = newScoreMap.get(`${titleKeyForDedup(rawTitle)}::${d.abbr}`) ?? null;
+          const newRadarValue = newScore !== null ? (newScore / maxEx) * radar.max : null;
+          const scoreDiff = newScore !== null ? newScore - oldScore : null;
+
+          allEntries.push({ title: rawTitle, diffFull: d.full, diffAbbr: d.abbr, level,
+            oldScore, oldRadarValue, newScore, newRadarValue, scoreDiff, maxEx, radarMax: radar.max });
+        }
+      }
+
+      // 旧レーダー値降順でタイトル重複排除 → 上位20件
+      allEntries.sort((a, b) => b.oldRadarValue - a.oldRadarValue);
+      const repMap = new Map();
+      for (const e of allEntries) {
+        if (!repMap.has(titleKeyForDedup(e.title))) repMap.set(titleKeyForDedup(e.title), e);
+      }
+      const top20 = [...repMap.values()].slice(0, 20);
+
+      const cnt = Math.min(top20.length, 10);
+      const oldTotal = cnt > 0
+        ? Math.floor(top20.slice(0, cnt).reduce((s, e) => s + Math.floor(e.oldRadarValue * 100) / 100, 0) / cnt * 100) / 100
+        : 0;
+      const newTotal = computeRadarValues()[activeTab] ?? 0;
+      const totalDiff = Math.floor((newTotal - oldTotal) * 100) / 100;
+      document.getElementById('info-text').textContent = `${activeTab} — 旧スコア上位 20 件`;
+      const avgEl = document.getElementById('avg-value');
+      avgEl.style.display = '';
+      avgEl.textContent = `旧：${oldTotal.toFixed(2)}　新：${newTotal.toFixed(2)}　(${totalDiff >= 0 ? '+' : ''}${totalDiff.toFixed(2)})`;
+
+      document.getElementById('thead').innerHTML = `<tr>
+        <th style="width:40px">#</th>
+        <th class="left">タイトル</th>
+        <th>難易度</th><th>☆</th>
+        <th>旧EXスコア</th>
+        <th>旧レーダー値</th>
+        <th>新EXスコア</th>
+        <th>新レーダー値</th>
+      </tr>`;
+
+      function djHtml(score, maxEx) {
+        const { nearestName, diff } = getDJLevelInfo(score, maxEx);
+        const sign = (diff >= 0 && nearestName !== 'MAX-') ? '+' : '';
+        const colorLevel = (diff < 0 && nearestName !== 'MAX-' && nearestName !== 'MAX') ? oneLevelBelow(nearestName) : nearestName;
+        return `<br><span class="dj-info dj-${colorLevel}">(${nearestName}${sign}${diff})</span>`;
+      }
+
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = top20.map((e, i) => {
+        const isImproved = e.scoreDiff !== null && e.scoreDiff >= 0;
+        const noNew = e.newScore === null;
+        const rowClass = isImproved ? 'comparison-improved' : (noNew ? 'out-of-top10' : '');
+
+        const oldRadarStr = (Math.floor(e.oldRadarValue * 100) / 100).toFixed(2);
+
+        let scoreDiffHtml = '';
+        if (e.scoreDiff !== null) {
+          if (e.scoreDiff > 0)      scoreDiffHtml = `<span style="color:#68d391;font-size:11px;"> (+${e.scoreDiff.toLocaleString()})</span>`;
+          else if (e.scoreDiff < 0) scoreDiffHtml = `<span style="color:#fc8181;font-size:11px;"> (${e.scoreDiff.toLocaleString()})</span>`;
+          else                      scoreDiffHtml = `<span style="color:#718096;font-size:11px;"> (±0)</span>`;
+        }
+
+        const newScoreCell = noNew
+          ? `<span class="comp-no-new">—</span>`
+          : `<span class="${isImproved ? 'comp-score-improved' : ''}">${e.newScore.toLocaleString()}${scoreDiffHtml}${djHtml(e.newScore, e.maxEx)}</span>`;
+
+        const newRadarCell = e.newRadarValue === null
+          ? `<span class="comp-no-new">—</span>`
+          : `<span class="${isImproved ? 'comp-score-improved' : ''}">${(Math.floor(e.newRadarValue * 100) / 100).toFixed(2)}</span>`;
+
+        return `<tr class="${rowClass}">
+          <td class="rank center">${i + 1}</td>
+          <td class="title" title="${escHtml(displayTitle(e.title))}">${escHtml(displayTitle(e.title))}</td>
+          <td class="center"><span class="badge badge-${e.diffAbbr}"><span class="diff-full">${e.diffFull}</span><span class="diff-abbr">${e.diffAbbr}</span></span></td>
+          <td class="center">${(e.level && e.level !== '0') ? '☆' + e.level : '—'}</td>
+          <td class="right">${e.oldScore.toLocaleString()}${djHtml(e.oldScore, e.maxEx)}</td>
+          <td class="radar">${oldRadarStr}</td>
+          <td class="right">${newScoreCell}</td>
+          <td class="radar">${newRadarCell}</td>
+        </tr>`;
+      }).join('');
     }
 
     // ── レーダーチャート描画 ──────────────────
@@ -1781,6 +1996,58 @@
       return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     }
 
+    // ── 旧バージョンCSV読み込み ─────────────
+    function loadOldScoreText(text, label) {
+      const { rows } = parseCSV(text);
+      oldScoreRows = rows;
+      localStorage.setItem('nrv_old_csv',      text);
+      localStorage.setItem('nrv_old_csv_name', label);
+      document.getElementById('name-old-score').textContent = '✔ ' + label;
+      document.getElementById('card-old-score').classList.add('loaded');
+      if (typeof gtag === 'function') gtag('event', 'old_csv_import', { method: label });
+      if (viewMode === 'comparison') renderComparisonTab();
+    }
+
+    const cardOld = document.getElementById('card-old-score');
+    document.getElementById('input-old-score').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => loadOldScoreText(ev.target.result, file.name);
+      reader.readAsText(file, 'UTF-8');
+    });
+    cardOld.addEventListener('dragover',  e => { e.preventDefault(); cardOld.classList.add('drag-over'); });
+    cardOld.addEventListener('dragleave', () => cardOld.classList.remove('drag-over'));
+    cardOld.addEventListener('drop', e => {
+      e.preventDefault();
+      cardOld.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => loadOldScoreText(ev.target.result, file.name);
+      reader.readAsText(file, 'UTF-8');
+    });
+    document.getElementById('old-upload-header').addEventListener('click', () => cardOld.classList.toggle('open'));
+    document.getElementById('btn-old-clipboard').addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (!text.trim()) { alert('クリップボードにテキストがありません。'); return; }
+        loadOldScoreText(text, 'クリップボード（旧バージョン）');
+      } catch {
+        alert('クリップボードへのアクセスが許可されていません。');
+      }
+    });
+    document.getElementById('btn-toggle-old-paste').addEventListener('click', () => {
+      document.getElementById('old-paste-area').classList.toggle('open');
+    });
+    document.getElementById('btn-old-paste-load').addEventListener('click', () => {
+      const text = document.getElementById('old-paste-textarea').value;
+      if (!text.trim()) { alert('テキストが空です。'); return; }
+      loadOldScoreText(text, 'テキスト貼り付け（旧バージョン）');
+      document.getElementById('old-paste-area').classList.remove('open');
+      document.getElementById('old-paste-textarea').value = '';
+    });
+
     // ── 行選択（タップ/クリックでトグル・localStorage永続化）────────────────
     const SELECTED_KEY = 'nrv_selected_rows';
     let selectedRows = new Set(JSON.parse(localStorage.getItem(SELECTED_KEY) || '[]'));
@@ -1823,6 +2090,7 @@
     });
 
     document.getElementById('tbody').addEventListener('click', e => {
+      if (viewMode === 'comparison') return;
       const tr = e.target.closest('tr[data-row-key]');
       if (!tr) return;
       const key = tr.dataset.rowKey;
@@ -1934,6 +2202,18 @@
     } else {
       // キャッシュなし → 開いた状態で開始
       card.classList.add('open');
+    }
+
+    // 旧バージョンCSVキャッシュ復元
+    const cachedOldCSV  = localStorage.getItem('nrv_old_csv');
+    const cachedOldName = localStorage.getItem('nrv_old_csv_name');
+    if (cachedOldCSV) {
+      const { rows: oldRows } = parseCSV(cachedOldCSV);
+      oldScoreRows = oldRows;
+      document.getElementById('name-old-score').textContent = '✔ ' + cachedOldName + '（キャッシュ）';
+      document.getElementById('card-old-score').classList.add('loaded');
+    } else {
+      document.getElementById('card-old-score').classList.add('open');
     }
 
     fetchRadarData();
