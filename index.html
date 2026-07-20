@@ -780,6 +780,10 @@
         <h3>■リリースノート</h3>
       </div>
       <div class="modal-section">
+        <h3>〇2026/07/20</h3>
+        <p>・X共有時の挙動変更<br>└スマホ：画像自動添付、テキストはクリップボードにコピー<br>　PC：テキスト自動添付、画像はクリップボードにコピー<br>　のように挙動を変更しました。(Xの仕様変更により同時添付が出来ない為)</p>
+      </div>
+      <div class="modal-section">
         <h3>〇2026/06/21</h3>
         <p>・スコア差分表示を追加<br>└前回読み込み時のデータがある場合、更新曲のEXスコア差分、レーダー値差分が表示されるようになりました。<br><br>・過去作比較機能を追加<br>└過去作のレーダー値と現行作のレーダー値を比較できる機能を追加しました。</p>
       </div>
@@ -2152,11 +2156,15 @@
         const file = new File([blob], 'iidx-notes-radar.png', { type: 'image/png' });
 
         // ① Web Share API（スマホのみ）
+        // 𝕏 アプリは画像とテキストを同時に共有すると画像側を無視することがあるため、
+        // 画像は単体で共有し、投稿文は別途クリップボードにコピーして手動貼り付けしてもらう。
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
-            await navigator.share({ files: [file], text: tweetText });
-            noticeEl.textContent = '';
+            await navigator.clipboard.writeText(tweetText).catch(() => {});
+            await navigator.share({ files: [file] });
+            noticeEl.textContent = '投稿文をクリップボードにコピーしました。共有画面で𝕏を選び、画像を添付後に貼り付けてください。';
+            setTimeout(() => { noticeEl.textContent = ''; }, 10000);
             return;
           } catch (e) {
             if (e.name === 'AbortError') { noticeEl.textContent = ''; return; }
